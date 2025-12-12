@@ -141,6 +141,14 @@ const UserManagement = () => {
     );
   }
 
+  // Helper component for the "Field Top / Value Bottom" block
+  const DataBlock = ({ label, value, dir = "rtl", className = "" }: { label: string, value: React.ReactNode, dir?: "rtl" | "ltr", className?: string }) => (
+    <div className={`flex flex-col gap-1 min-w-fit ${className}`}>
+      <span className="text-[10px] text-silver font-medium whitespace-nowrap">{label}</span>
+      <span className="text-sm font-bold text-charcoal whitespace-nowrap" dir={dir}>{value}</span>
+    </div>
+  );
+
   return (
     <div className="min-h-screen pb-24">
       <Header />
@@ -220,43 +228,81 @@ const UserManagement = () => {
                 style={{ animationDelay: `${index * 30}ms` }}
               >
                 <GlassBox
-                  onClick={() => navigate(`/users/${user.user_id}`)}
-                  className="flex items-center gap-4 p-4"
+                  className="p-0 overflow-hidden group hover:border-gold/50 transition-colors duration-300"
                 >
-                  {user.is_ban && (
-                    <div className="bg-destructive/20 p-1.5 rounded-full flex-shrink-0">
-                      <AlertTriangle className="w-4 h-4 text-destructive" />
+                  {/* Scrollable Container */}
+                  <div 
+                    className="overflow-x-auto w-full hide-scrollbar cursor-pointer"
+                    onClick={() => navigate(`/users/${user.user_id}`)}
+                  >
+                    {/* The Horizontal Queue of Data */}
+                    <div className="flex items-center px-4 py-3 min-w-max gap-8">
+                      
+                      {/* 1. Profile Image (Always visual anchor) */}
+                      <img
+                        src={getProfileImageUrl(user.profile_path)}
+                        alt={user.first_name}
+                        className="w-10 h-10 rounded-lg object-cover border border-silver-light flex-shrink-0"
+                        onError={(e) => {
+                          e.currentTarget.src = `https://ui-avatars.com/api/?name=${user.first_name}+${user.last_name}&background=e5e5e5&color=333`;
+                        }}
+                      />
+
+                      {/* 2. Name */}
+                      <DataBlock 
+                        label="نام و نام خانوادگی" 
+                        value={`${user.first_name} ${user.last_name}`} 
+                      />
+
+                      {/* 3. User ID */}
+                      <DataBlock 
+                        label="شناسه کاربر" 
+                        value={user.user_id} 
+                        dir="ltr" 
+                      />
+
+                      {/* 4. Username */}
+                      <DataBlock 
+                        label="نام کاربری" 
+                        value={`@${user.username || '---'}`} 
+                        dir="ltr" 
+                      />
+
+                      {/* 5. Phone */}
+                      <DataBlock 
+                        label="شماره تماس" 
+                        value={user.phone_number || '---'} 
+                        dir="ltr" 
+                      />
+
+                      {/* 6. Score */}
+                      <DataBlock 
+                        label="امتیاز" 
+                        value={user.score} 
+                        className="text-gold"
+                      />
+
+                      {/* 7. Country */}
+                      <DataBlock 
+                        label="کشور" 
+                        value={user.country} 
+                      />
+
+                       {/* 8. Status */}
+                       <DataBlock 
+                        label="وضعیت" 
+                        value={
+                          user.is_ban ? <span className="text-destructive">مسدود</span> : <span className="text-emerald-600">فعال</span>
+                        } 
+                      />
+
+                      {/* 9. Join Date */}
+                      <DataBlock 
+                        label="تاریخ عضویت" 
+                        value={formatDate(user.join_date)} 
+                      />
+
                     </div>
-                  )}
-                  <img
-                    src={getProfileImageUrl(user.profile_path)}
-                    alt={user.first_name}
-                    className="w-12 h-12 rounded-lg object-cover border border-silver-light flex-shrink-0"
-                    onError={(e) => {
-                      e.currentTarget.src = `https://ui-avatars.com/api/?name=${user.first_name}+${user.last_name}&background=e5e5e5&color=333`;
-                    }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-charcoal truncate">
-                      {user.first_name} {user.last_name}
-                    </h3>
-                    <p className="text-xs text-silver mt-0.5">
-                      @{user.username}
-                    </p>
-                  </div>
-                  <div className="text-left flex-shrink-0 hidden sm:block">
-                    <p className="text-xs text-silver">
-                      <span className="text-charcoal font-mono" dir="ltr">
-                        {user.user_id}
-                      </span>
-                    </p>
-                    <p className="text-xs text-silver mt-1">{user.country}</p>
-                  </div>
-                  <div className="text-left flex-shrink-0 hidden md:block">
-                    <p className="text-xs text-silver">تاریخ عضویت</p>
-                    <p className="text-xs text-charcoal">
-                      {formatDate(user.join_date)}
-                    </p>
                   </div>
                 </GlassBox>
               </div>
@@ -269,6 +315,7 @@ const UserManagement = () => {
         <Search className="w-6 h-6 text-charcoal" />
       </FloatingActionButton>
 
+      {/* Filter Modal Content Remains the Same */}
       <GlassModal
         isOpen={isFilterOpen}
         onClose={() => setIsFilterOpen(false)}
