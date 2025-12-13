@@ -14,12 +14,14 @@ export const GlassBox = ({
   className, 
   disabled = false, 
   onClick,
-  intense = false
+  // CHANGE THIS LINE: Default to true so it matches the Header
+  intense = true
 }: GlassBoxProps) => {
   return (
     <div
       onClick={!disabled ? onClick : undefined}
       className={cn(
+        // It will now always use "glass-intense" unless you specifically say false
         intense ? "glass-intense" : "glass",
         "rounded-2xl p-6 transition-all duration-300",
         onClick && !disabled && "cursor-pointer hover:scale-[1.02] hover:shadow-lg",
