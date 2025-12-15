@@ -10,12 +10,18 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { User, getProfileImageUrl } from "@/types/user";
+import { API_BASE_URL } from "@/config";
 
 const UserDetail = () => {
   const { userId } = useParams<{ userId: string }>();
   const [user, setUser] = useState<User | null>(null);
+  
+  // Loading states
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false); // New state for save button
+  
   const [isEditOpen, setIsEditOpen] = useState(false);
+  
   const [editData, setEditData] = useState({
     first_name: "",
     last_name: "",
@@ -28,45 +34,57 @@ const UserDetail = () => {
     is_ban: false,
     is_registered: true,
   });
+
   const { token } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchUser();
+    if (userId) {
+      fetchUser();
+    }
   }, [userId]);
 
   const fetchUser = async () => {
     try {
       const response = await fetch(
-        "https://pseudo-admin-panel.safaee1361.workers.dev/users",
+        `${API_BASE_URL}/admin/users-management/${userId}`,
         {
-          method: "POST",
+          method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
           },
         }
       );
 
-      if (response.ok) {
-        const data: User[] = await response.json();
-        const foundUser = data.find((u) => u.user_id === userId);
-        if (foundUser) {
-          setUser(foundUser);
-          setEditData({
-            first_name: foundUser.first_name,
-            last_name: foundUser.last_name,
-            nickname: foundUser.nickname,
-            username: foundUser.username,
-            phone_number: foundUser.phone_number || "",
-            whatsapp_number: foundUser.whatsapp_number || "",
-            country: foundUser.country,
-            score: foundUser.score,
-            is_ban: foundUser.is_ban,
-            is_registered: foundUser.is_registered,
-          });
-        }
+      const json = await response.json();
+
+      if (response.ok && json.data) {
+        const foundUser = json.data;
+        setUser(foundUser);
+        
+        // Populate edit form with current data
+        setEditData({
+          first_name: foundUser.first_name || "",
+          last_name: foundUser.last_name || "",
+          nickname: foundUser.nickname || "",
+          username: foundUser.username || "",
+          phone_number: foundUser.phone_number || "",
+          whatsapp_number: foundUser.whatsapp_number || "",
+          country: foundUser.country || "",
+          score: foundUser.score || 0,
+          is_ban: foundUser.is_ban || false,
+          is_registered: foundUser.is_registered || false,
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "خطا",
+          description: "کاربر یافت نشد",
+        });
       }
     } catch (error) {
+      console.error("Fetch error:", error);
       toast({
         variant: "destructive",
         title: "خطا",
@@ -77,23 +95,62 @@ const UserDetail = () => {
     }
   };
 
-  const handleSave = () => {
-    // In a real app, this would call an API
-    if (user) {
-      setUser({
-        ...user,
-        ...editData,
+  const handleSave = async () => {
+    if (!user) return;
+    setIsSaving(true);
+
+    try {
+      // Construct the payload
+      // We convert userId to integer as most backends expect ID as number in JSON
+      const payload = {
+        user_id: parseInt(user.user_id) || user.user_id, 
+        ...editData
+      };
+
+      const response = await fetch(`${API_BASE_URL}/admin/users-management/update`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
       });
+
+      const json = await response.json();
+
+      if (response.ok && json.data) {
+        // Update local state with the server response (Source of Truth)
+        setUser(json.data);
+        setIsEditOpen(false);
+        toast({
+          title: "موفقیت",
+          description: "اطلاعات کاربر با موفقیت بروزرسانی شد",
+        });
+      } else {
+        // Handle API errors (e.g., 404 or validation error)
+        const errorMsg = json.error?.message || "خطا در بروزرسانی اطلاعات";
+        toast({
+          variant: "destructive",
+          title: "خطا",
+          description: errorMsg,
+        });
+      }
+    } catch (error) {
+      console.error("Update error:", error);
+      toast({
+        variant: "destructive",
+        title: "خطا",
+        description: "مشکلی در برقراری ارتباط با سرور پیش آمد",
+      });
+    } finally {
+      setIsSaving(false);
     }
-    setIsEditOpen(false);
-    toast({
-      title: "ذخیره شد",
-      description: "تغییرات با موفقیت اعمال شد",
-    });
   };
 
-  const formatDate = (timestamp: string) => {
-    const date = new Date(parseInt(timestamp) * 1000);
+  // --- Formatters ---
+  const formatDate = (timestamp: string | number | null) => {
+    if (!timestamp) return "-";
+    const date = new Date(Number(timestamp) * 1000);
     return new Intl.DateTimeFormat("fa-IR", {
       year: "numeric",
       month: "long",
@@ -101,7 +158,8 @@ const UserDetail = () => {
     }).format(date);
   };
 
-  const formatDateTime = (isoString: string) => {
+  const formatDateTime = (isoString: string | null) => {
+    if (!isoString) return "-";
     const date = new Date(isoString);
     return new Intl.DateTimeFormat("fa-IR", {
       year: "numeric",
@@ -169,13 +227,13 @@ const UserDetail = () => {
               alt={user.first_name}
               className="w-28 h-28 rounded-full object-cover border-4 border-silver-light mb-4"
               onError={(e) => {
-                e.currentTarget.src = `https://ui-avatars.com/api/?name=${user.first_name}+${user.last_name}&background=e5e5e5&color=333&size=128`;
+                e.currentTarget.src = `https://ui-avatars.com/api/?name=${user.first_name || 'User'}+${user.last_name || ''}&background=e5e5e5&color=333&size=128`;
               }}
             />
             <h1 className="text-2xl font-bold text-charcoal">
               {user.first_name} {user.last_name}
             </h1>
-            <p className="text-silver mt-1">@{user.username}</p>
+            <p className="text-silver mt-1">@{user.username || '---'}</p>
             <div className="flex items-center gap-2 mt-2 text-silver text-sm">
               <Globe className="w-4 h-4" />
               <span>{user.country}</span>
@@ -223,6 +281,7 @@ const UserDetail = () => {
         <Pencil className="w-6 h-6 text-charcoal" />
       </FloatingActionButton>
 
+      {/* EDIT MODAL */}
       <GlassModal
         isOpen={isEditOpen}
         onClose={() => setIsEditOpen(false)}
@@ -288,7 +347,7 @@ const UserDetail = () => {
               <label className="text-sm font-medium text-silver">شماره واتساپ</label>
               <Input
                 type="text"
-                value={editData.whatsapp_number || ""}
+                value={editData.whatsapp_number}
                 onChange={(e) => setEditData((prev) => ({ ...prev, whatsapp_number: e.target.value }))}
                 className="bg-secondary/50 border-silver-light/50 text-charcoal rounded-xl"
                 dir="ltr"
@@ -344,8 +403,17 @@ const UserDetail = () => {
           </div>
 
           <div className="flex gap-3 pt-4">
-            <Button variant="gold" className="flex-1 rounded-xl" onClick={handleSave}>
-              <Check className="w-4 h-4 ml-2" />
+            <Button 
+              variant="gold" 
+              className="flex-1 rounded-xl" 
+              onClick={handleSave}
+              disabled={isSaving}
+            >
+              {isSaving ? (
+                 <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+              ) : (
+                 <Check className="w-4 h-4 ml-2" />
+              )}
               ذخیره تغییرات
             </Button>
           </div>

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { GlassBox } from "@/components/GlassBox";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { API_BASE_URL } from "@/config"; // Import the central URL
 
 const Login = () => {
   const [username, setUsername] = useState("");
@@ -20,38 +21,49 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(
-        "https://pseudo-admin-panel.safaee1361.workers.dev/login",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ username, password }),
-        }
-      );
+      // 1. Prepare data as Form URL Encoded (Required by your API)
+      const formData = new URLSearchParams();
+      formData.append("username", username);
+      formData.append("password", password);
+
+      // 2. Send Request
+      const response = await fetch(`${API_BASE_URL}/admin/auth/login`, {
+        method: "POST",
+        headers: {
+          // Important: This matches the curl command you provided
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: formData,
+      });
 
       const data = await response.json();
 
-      if (data.success && data.token) {
-        login(data.token);
+      // 3. Handle Response
+      if (response.ok && data.access_token) {
+        // Success: The API returns { access_token: "...", ... }
+        login(data.access_token);
+        
         toast({
           title: "خوش آمدید!",
           description: "ورود با موفقیت انجام شد",
         });
         navigate("/dashboard");
       } else {
+        // Error: The API returns { error: { message: "..." } }
+        const errorMessage = data.error?.message || "نام کاربری یا رمز عبور اشتباه است";
+        
         toast({
           variant: "destructive",
           title: "خطا در ورود",
-          description: "نام کاربری یا رمز عبور اشتباه است",
+          description: errorMessage,
         });
       }
     } catch (error) {
+      console.error("Login error:", error);
       toast({
         variant: "destructive",
         title: "خطا",
-        description: "مشکلی در برقراری ارتباط پیش آمد",
+        description: "مشکلی در برقراری ارتباط با سرور پیش آمد",
       });
     } finally {
       setIsLoading(false);
