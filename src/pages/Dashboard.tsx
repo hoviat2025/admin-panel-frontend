@@ -43,7 +43,7 @@ disabled: false,
     description: "مشاهده آمار و ارقام مختلف مانند تعداد کاربران و ...",
     icon: BarChart3,
     path: "/stats",
-    disabled: true,
+    disabled: false,
   },
   {
     id: "ai",

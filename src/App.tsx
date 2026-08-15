@@ -11,6 +11,7 @@ import UserManagement from "./pages/UserManagement";
 import UserDetail from "./pages/UserDetail";
 import NotFound from "./pages/NotFound";
 import AuditHistory from "./pages/AuditHistory";
+import Statistics from "./pages/Statistics";
 
 const queryClient = new QueryClient();
 
@@ -56,6 +57,10 @@ const AppRoutes = () => {
       <Route
         path="/audit-history"
         element={<ProtectedRoute><AuditHistory /></ProtectedRoute>}
+      />
+      <Route
+        path="/stats"
+        element={<ProtectedRoute><Statistics /></ProtectedRoute>}
       />
       <Route path="*" element={<NotFound />} />
     </Routes>
