@@ -106,6 +106,40 @@ const createEditData = (user?: User): EditData => {
   return data;
 };
 
+const EditInput = ({
+  field,
+  value,
+  onChange,
+  className = "",
+}: {
+  field: EditField;
+  value: string;
+  onChange: (value: string) => void;
+  className?: string;
+}) => (
+  <label className={`block min-w-0 space-y-2 ${className}`}>
+    <span className="text-sm font-medium text-silver">{field.label}</span>
+    {field.multiline ? (
+      <Textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="min-h-28 w-full min-w-0 rounded-xl border-silver-light/50 bg-secondary/50 text-charcoal"
+        dir={field.dir}
+      />
+    ) : (
+      <Input
+        type={field.type ?? "text"}
+        step={field.type === "number" || field.type === "datetime-local" ? "1" : undefined}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full min-w-0 rounded-xl border-silver-light/50 bg-secondary/50 text-charcoal"
+        dir={field.dir}
+      />
+    )}
+    {field.hint && <span className="block text-xs text-silver">{field.hint}</span>}
+  </label>
+);
+
 const UserDetail = () => {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
@@ -277,33 +311,6 @@ const UserDetail = () => {
     setEditData((previous) => ({ ...previous, [key]: value }));
   };
 
-  const EditInput = ({ field }: { field: EditField }) => {
-    const value = String(editData[field.key] ?? "");
-    return (
-      <label className="block space-y-2">
-        <span className="text-sm font-medium text-silver">{field.label}</span>
-        {field.multiline ? (
-          <Textarea
-            value={value}
-            onChange={(event) => setEditValue(field.key, event.target.value)}
-            className="min-h-28 rounded-xl border-silver-light/50 bg-secondary/50 text-charcoal"
-            dir={field.dir}
-          />
-        ) : (
-          <Input
-            type={field.type ?? "text"}
-            step={field.type === "number" || field.type === "datetime-local" ? "1" : undefined}
-            value={value}
-            onChange={(event) => setEditValue(field.key, event.target.value)}
-            className="rounded-xl border-silver-light/50 bg-secondary/50 text-charcoal"
-            dir={field.dir}
-          />
-        )}
-        {field.hint && <span className="block text-xs text-silver">{field.hint}</span>}
-      </label>
-    );
-  };
-
   const openEditForm = () => {
     setEditData(createEditData(user));
     setIsEditOpen(true);
@@ -434,7 +441,7 @@ const UserDetail = () => {
           </div>
 
           <Tabs defaultValue="profile" dir="rtl">
-            <TabsList className="mb-4 grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4">
+            <TabsList className="mb-4 grid h-auto w-full grid-cols-2 gap-1">
               <TabsTrigger value="profile">اطلاعات اصلی</TabsTrigger>
               <TabsTrigger value="status">وضعیت</TabsTrigger>
               <TabsTrigger value="messages">پیام‌ها</TabsTrigger>
@@ -443,14 +450,28 @@ const UserDetail = () => {
 
             <TabsContent value="profile" className="space-y-4">
               <p className="text-xs text-silver">خالی گذاشتن یک فیلد اختیاری، مقدار آن را پاک می‌کند.</p>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {profileFields.map((field) => <EditInput key={field.key} field={field} />)}
+              <div className="flex flex-col gap-4">
+                {profileFields.map((field) => (
+                  <EditInput
+                    key={field.key}
+                    field={field}
+                    value={String(editData[field.key] ?? "")}
+                    onChange={(value) => setEditValue(field.key, value)}
+                  />
+                ))}
               </div>
             </TabsContent>
 
             <TabsContent value="status" className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {statusNumberFields.map((field) => <EditInput key={field.key} field={field} />)}
+              <div className="flex flex-col gap-4">
+                {statusNumberFields.map((field) => (
+                  <EditInput
+                    key={field.key}
+                    field={field}
+                    value={String(editData[field.key] ?? "")}
+                    onChange={(value) => setEditValue(field.key, value)}
+                  />
+                ))}
                 {booleanFields.map((field) => (
                   <label key={field.key} className="block space-y-2">
                     <span className="text-sm font-medium text-silver">{field.label}</span>
@@ -469,17 +490,22 @@ const UserDetail = () => {
 
             <TabsContent value="messages" className="space-y-4">
               <p className="text-xs text-silver">شناسه‌های مربوط به پیام‌های کاربر در کانال‌ها و گروه‌ها.</p>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {messageFields.map((field) => <EditInput key={field.key} field={field} />)}
+              <div className="flex flex-col gap-4">
+                {messageFields.map((field) => (
+                  <EditInput key={field.key} field={field} value={String(editData[field.key] ?? "")} onChange={(value) => setEditValue(field.key, value)} />
+                ))}
               </div>
             </TabsContent>
 
             <TabsContent value="hilfen" className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-4">
                 {hilfenFields.map((field) => (
-                  <div key={field.key} className={field.multiline ? "sm:col-span-2" : ""}>
-                    <EditInput field={field} />
-                  </div>
+                  <EditInput
+                    key={field.key}
+                    field={field}
+                    value={String(editData[field.key] ?? "")}
+                    onChange={(value) => setEditValue(field.key, value)}
+                  />
                 ))}
               </div>
             </TabsContent>
