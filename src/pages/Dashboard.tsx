@@ -76,15 +76,15 @@ const Dashboard = () => {
               <GlassBox
                 onClick={() => !item.disabled && navigate(item.path)}
                 disabled={item.disabled}
-                className="h-full flex flex-col items-center text-center relative"
+                className="group h-full flex flex-col items-center text-center relative"
               >
                 {item.disabled && (
                   <span className="absolute top-3 left-3 text-xs text-silver bg-secondary/80 px-2 py-1 rounded-full z-10">
                     به زودی
                   </span>
                 )}
-                <div className="w-14 h-14 rounded-full bg-secondary/50 flex items-center justify-center mb-4">
-                  <item.icon className="w-7 h-7 text-charcoal" />
+                <div className="w-14 h-14 rounded-full bg-secondary/50 flex items-center justify-center mb-4 transition-all duration-300 group-hover:bg-accent/20 group-hover:shadow-[0_8px_22px_hsl(var(--gold)/0.18)]">
+                  <item.icon className="w-7 h-7 text-charcoal transition-all duration-300 group-hover:scale-110 group-hover:text-primary group-hover:drop-shadow-[0_8px_12px_hsl(var(--gold)/0.35)]" />
                 </div>
                 <h3 className="font-bold text-charcoal mb-2">{item.title}</h3>
                 <p className="text-sm text-silver leading-relaxed">
