@@ -24,7 +24,7 @@ export const GlassBox = ({
         // It will now always use "glass-intense" unless you specifically say false
         intense ? "glass-intense" : "glass",
         "rounded-2xl p-6 transition-all duration-300",
-        onClick && !disabled && "cursor-pointer hover:scale-[1.02] hover:shadow-lg",
+        onClick && !disabled && "cursor-pointer hover:-translate-y-1 hover:shadow-xl active:translate-y-0",
         disabled && "disabled-overlay cursor-not-allowed",
         className
       )}
