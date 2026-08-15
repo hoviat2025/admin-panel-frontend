@@ -33,7 +33,6 @@ export const Header = () => {
             <ArrowRight className="h-5 w-5 text-charcoal" />
           )}
         </Button>
-
         <h1 className="text-lg font-bold text-charcoal">پنل مدیریت</h1>
 
         <Button

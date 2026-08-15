@@ -8,19 +8,125 @@ import {
   AlertTriangle, 
   Loader2, 
   ChevronRight, 
-  ChevronLeft 
+  ChevronLeft,
+  X,
+  Plus,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Header } from "@/components/Header";
 import { GlassBox } from "@/components/GlassBox";
 import { FloatingActionButton } from "@/components/FloatingActionButton";
 import { GlassModal } from "@/components/GlassModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { User, getProfileImageUrl } from "@/types/user";
+import { dateTimeLocalToUnixSeconds, formatDateTime, formatUnixDateTime, getMembershipKind } from "@/lib/userDisplay";
 
 type ViewMode = "card" | "list";
+type FilterValues = Record<string, string>;
+
+type AdvancedFilterOption = {
+  param: string;
+  label: string;
+  type?: "text" | "number" | "datetime-local";
+  choices?: { value: string; label: string }[];
+  transport?: "unix-seconds" | "iso-datetime";
+  zeroLabel?: string;
+};
+
+const yesNoChoices = [
+  { value: "true", label: "بله" },
+  { value: "false", label: "خیر" },
+];
+
+const emptyChoices = [
+  { value: "true", label: "خالی باشد" },
+  { value: "false", label: "خالی نباشد" },
+];
+
+const textFields = [
+  ["username", "نام کاربری تلگرام"], ["first_name", "نام"], ["last_name", "نام خانوادگی"],
+  ["nickname", "نام مستعار"], ["country", "کشور"], ["phone_number", "شماره تلفن"],
+  ["whatsapp_number", "شماره واتساپ"], ["profile_path", "مسیر تصویر پروفایل"],
+  ["accounting_code", "کد حسابداری"], ["password", "رمز عبور"], ["mode", "حالت"],
+  ["hilfen_status", "وضعیت هیلفن"], ["hilfen_command", "دستور هیلفن"],
+  ["hilfen_data", "اطلاعات هیلفن"], ["hilfen_id_card_photo", "تصویر کارت شناسایی هیلفن"],
+] as const;
+
+const exactOnlyFields = [
+  ["telegram_message_id", "شناسه پیام تلگرام"], ["group_message_id", "شناسه پیام گروه"],
+  ["public_message_id", "شناسه پیام عمومی"], ["public_group_message_id", "شناسه پیام گروه عمومی"],
+] as const;
+
+const numericFields = [
+  ["user_id", "شناسه عددی تلگرام"], ["counter", "شماره کاربر یوروبات"],
+  ["score", "امتیاز"], ["hilfen_id", "شناسه هیلفن"],
+  ["hilfen_all_projects", "تعداد پروژه‌های هیلفن"],
+  ["hilfen_all_projects_done", "پروژه‌های تکمیل‌شده هیلفن"],
+  ["hilfen_message_id", "شناسه پیام هیلفن"],
+  ["hilfen_group_message_id", "شناسه پیام گروه هیلفن"],
+] as const;
+
+const ADVANCED_FILTER_OPTIONS: AdvancedFilterOption[] = [
+  ...textFields.flatMap(([param, label]) => [
+    { param, label: `${label}؛ دقیق` },
+    { param: `${param}_contains`, label: `${label}؛ شامل عبارت` },
+  ]),
+  ...exactOnlyFields.map(([param, label]) => ({ param, label: `${label}؛ دقیق` })),
+  ...numericFields.map(([param, label]) => ({ param, label: `${label}؛ دقیق`, type: "number" as const })),
+  { param: "ban_time", label: "تاریخ مسدودی؛ دقیق", type: "datetime-local", transport: "unix-seconds", zeroLabel: "بدون تاریخ مسدودی" },
+  { param: "join_date", label: "تاریخ عضویت؛ دقیق", type: "datetime-local", transport: "unix-seconds" },
+  { param: "hilfen_date_join", label: "تاریخ عضویت هیلفن؛ دقیق", type: "datetime-local", transport: "unix-seconds" },
+  { param: "hilfen_limits_time", label: "تاریخ محدودیت هیلفن؛ دقیق", type: "datetime-local", transport: "unix-seconds", zeroLabel: "بدون محدودیت" },
+  { param: "min_counter", label: "شماره کاربر یوروبات؛ حداقل", type: "number" },
+  { param: "max_counter", label: "شماره کاربر یوروبات؛ حداکثر", type: "number" },
+  { param: "min_score", label: "امتیاز؛ حداقل", type: "number" },
+  { param: "max_score", label: "امتیاز؛ حداکثر", type: "number" },
+  { param: "min_ban_time", label: "تاریخ مسدودی؛ از", type: "datetime-local", transport: "unix-seconds" },
+  { param: "max_ban_time", label: "تاریخ مسدودی؛ تا", type: "datetime-local", transport: "unix-seconds" },
+  { param: "joined_after_unix", label: "تاریخ عضویت؛ از", type: "datetime-local", transport: "unix-seconds" },
+  { param: "joined_before_unix", label: "تاریخ عضویت؛ تا", type: "datetime-local", transport: "unix-seconds" },
+  { param: "min_hilfen_id", label: "شناسه هیلفن؛ حداقل", type: "number" },
+  { param: "max_hilfen_id", label: "شناسه هیلفن؛ حداکثر", type: "number" },
+  { param: "hilfen_joined_after_unix", label: "تاریخ عضویت هیلفن؛ از", type: "datetime-local", transport: "unix-seconds" },
+  { param: "hilfen_joined_before_unix", label: "تاریخ عضویت هیلفن؛ تا", type: "datetime-local", transport: "unix-seconds" },
+  { param: "min_hilfen_all_projects", label: "تعداد پروژه‌های هیلفن؛ حداقل", type: "number" },
+  { param: "max_hilfen_all_projects", label: "تعداد پروژه‌های هیلفن؛ حداکثر", type: "number" },
+  { param: "min_hilfen_projects_done", label: "پروژه‌های تکمیل‌شده هیلفن؛ حداقل", type: "number" },
+  { param: "max_hilfen_projects_done", label: "پروژه‌های تکمیل‌شده هیلفن؛ حداکثر", type: "number" },
+  { param: "min_hilfen_limits_time", label: "تاریخ محدودیت هیلفن؛ از", type: "datetime-local", transport: "unix-seconds" },
+  { param: "max_hilfen_limits_time", label: "تاریخ محدودیت هیلفن؛ تا", type: "datetime-local", transport: "unix-seconds" },
+  { param: "updated_after", label: "آخرین تغییر؛ از", type: "datetime-local", transport: "iso-datetime" },
+  { param: "updated_before", label: "آخرین تغییر؛ تا", type: "datetime-local", transport: "iso-datetime" },
+  { param: "channel_updated_after", label: "آخرین همگام‌سازی کانال؛ از", type: "datetime-local", transport: "iso-datetime" },
+  { param: "channel_updated_before", label: "آخرین همگام‌سازی کانال؛ تا", type: "datetime-local", transport: "iso-datetime" },
+  { param: "is_ban", label: "کاربر مسدود است", choices: yesNoChoices },
+  { param: "is_registered", label: "کاربر ثبت‌نام کرده است", choices: yesNoChoices },
+  { param: "chat_not_found", label: "گفتگوی کاربر پیدا نشده است", choices: yesNoChoices },
+  { param: "is_in_eurobot", label: "عضو یوروبات است", choices: yesNoChoices },
+  { param: "is_in_hilfen_bot", label: "عضو هیلفن است", choices: yesNoChoices },
+  ...[
+    ["no_counter", "شماره کاربر یوروبات"], ["no_accounting_code", "کد حسابداری"],
+    ["no_username", "نام کاربری تلگرام"], ["no_first_name", "نام"], ["no_last_name", "نام خانوادگی"],
+    ["no_nickname", "نام مستعار"], ["no_phone_number", "شماره تلفن"], ["no_whatsapp_number", "شماره واتساپ"],
+    ["no_country", "کشور"], ["no_password", "رمز عبور"], ["no_mode", "حالت"],
+    ["no_join_date", "تاریخ عضویت"], ["no_profile_path", "تصویر پروفایل"],
+    ["no_telegram_msg_id", "شناسه پیام تلگرام"], ["no_group_msg_id", "شناسه پیام گروه"],
+    ["no_public_msg_id", "شناسه پیام عمومی"], ["no_public_group_msg_id", "شناسه پیام گروه عمومی"],
+    ["no_hilfen_id", "شناسه هیلفن"], ["no_hilfen_status", "وضعیت هیلفن"],
+    ["no_hilfen_date_join", "تاریخ عضویت هیلفن"], ["no_hilfen_command", "دستور هیلفن"],
+    ["no_hilfen_data", "اطلاعات هیلفن"], ["no_hilfen_id_card_photo", "تصویر کارت شناسایی هیلفن"],
+    ["no_hilfen_all_projects", "تعداد پروژه‌های هیلفن"],
+    ["no_hilfen_all_projects_done", "پروژه‌های تکمیل‌شده هیلفن"],
+    ["no_hilfen_limits_time", "زمان محدودیت هیلفن"], ["no_hilfen_msg_id", "شناسه پیام هیلفن"],
+    ["no_hilfen_group_msg_id", "شناسه پیام گروه هیلفن"], ["no_channel_update", "زمان همگام‌سازی کانال"],
+  ].map(([param, label]) => ({ param, label: `${label}؛ خالی یا غیرخالی`, choices: emptyChoices })),
+];
+
+const advancedOptionByParam = Object.fromEntries(ADVANCED_FILTER_OPTIONS.map((option) => [option.param, option]));
 
 interface PaginationMeta {
   total: number;
@@ -38,18 +144,13 @@ const UserManagement = () => {
   // UI State
   const [viewMode, setViewMode] = useState<ViewMode>("card");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [filterMode, setFilterMode] = useState("simple");
+  const [advancedParam, setAdvancedParam] = useState(ADVANCED_FILTER_OPTIONS[0].param);
+  const [advancedValue, setAdvancedValue] = useState("");
 
   // Filter State
   // 'filters' is the temporary state inside the modal form
-  const [filters, setFilters] = useState({
-    name: "", // Maps to first_name
-    userId: "",
-    username: "",
-    phoneNumber: "",
-    country: "",
-    isBanned: "",
-    isRegistered: "",
-  });
+  const [filters, setFilters] = useState<FilterValues>({});
 
   // 'appliedFilters' is what actually triggers the API call
   const [appliedFilters, setAppliedFilters] = useState(filters);
@@ -74,16 +175,18 @@ const UserManagement = () => {
       // Default Sort
       params.append("order_by", "-counter"); 
 
-      // 2. Map Frontend Filters to Backend API Params
-      if (appliedFilters.name) params.append("first_name", appliedFilters.name);
-      if (appliedFilters.userId) params.append("user_id", appliedFilters.userId);
-      if (appliedFilters.username) params.append("username", appliedFilters.username);
-      if (appliedFilters.phoneNumber) params.append("phone_number", appliedFilters.phoneNumber);
-      if (appliedFilters.country) params.append("country", appliedFilters.country);
-      
-      // Booleans need "true" or "false" strings
-      if (appliedFilters.isBanned) params.append("is_ban", appliedFilters.isBanned);
-      if (appliedFilters.isRegistered) params.append("is_registered", appliedFilters.isRegistered);
+      Object.entries(appliedFilters).forEach(([key, value]) => {
+        if (!value) return;
+        const option = advancedOptionByParam[key];
+        if (option?.transport === "unix-seconds" && value !== "0") {
+          const unixValue = dateTimeLocalToUnixSeconds(value);
+          if (unixValue !== null) params.append(key, String(unixValue));
+        } else if (option?.transport === "iso-datetime") {
+          params.append(key, new Date(value).toISOString());
+        } else {
+          params.append(key, value);
+        }
+      });
 
       // 3. Call API
       const response = await fetch(
@@ -131,19 +234,35 @@ const UserManagement = () => {
   };
 
   const handleClearFilters = () => {
-    const emptyFilters = { 
-      name: "", 
-      userId: "", 
-      username: "", 
-      phoneNumber: "", 
-      country: "", 
-      isBanned: "", 
-      isRegistered: "" 
-    };
+    const emptyFilters: FilterValues = {};
     setFilters(emptyFilters);
     setAppliedFilters(emptyFilters);
     setMeta(prev => ({ ...prev, page: 1 }));
     setIsFilterOpen(false);
+  };
+
+  const setFilter = (name: string, value: string) => {
+    setFilters((previous) => ({ ...previous, [name]: value }));
+  };
+
+  const addAdvancedFilter = () => {
+    if (!advancedValue) return;
+    setFilter(advancedParam, advancedValue);
+    setAdvancedValue("");
+  };
+
+  const addAdvancedZeroValue = () => {
+    if (!selectedAdvancedOption?.zeroLabel) return;
+    setFilter(advancedParam, "0");
+    setAdvancedValue("");
+  };
+
+  const removeFilter = (name: string) => {
+    setFilters((previous) => {
+      const next = { ...previous };
+      delete next[name];
+      return next;
+    });
   };
 
   const handlePageChange = (newPage: number) => {
@@ -155,15 +274,7 @@ const UserManagement = () => {
   };
 
   const formatDate = (timestamp: string | number | null) => {
-    if (!timestamp) return "---";
-    
-    // Convert to number safely
-    const timeValue = Number(timestamp);
-    
-    if (isNaN(timeValue)) return "---";
-
-    const date = new Date(timeValue * 1000);
-    return new Intl.DateTimeFormat("fa-IR").format(date);
+    return formatUnixDateTime(timestamp);
   };
 
   // Helper component for "Field Top / Value Bottom"
@@ -173,6 +284,17 @@ const UserManagement = () => {
       <span className="text-sm font-bold text-charcoal whitespace-nowrap" dir={dir}>{value}</span>
     </div>
   );
+
+  const selectedAdvancedOption = advancedOptionByParam[advancedParam];
+  const activeFilters = Object.entries(filters).filter(([, value]) => value !== "");
+  const displayFilterValue = (param: string, value: string) => {
+    const option = advancedOptionByParam[param];
+    if (value === "0" && option?.zeroLabel) return option.zeroLabel;
+    const choice = option?.choices?.find((item) => item.value === value);
+    if (choice) return choice.label;
+    if (option?.transport) return formatDateTime(value);
+    return value;
+  };
 
   return (
     <div className="min-h-screen pb-24">
@@ -223,7 +345,7 @@ const UserManagement = () => {
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {users.map((user, index) => (
                   <div
-                    key={user.counter}
+                    key={user.user_id}
                     className="animate-slide-up"
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
@@ -251,6 +373,7 @@ const UserManagement = () => {
                         {user.user_id}
                       </p>
                       <p className="text-xs text-charcoal mt-1">{user.country || "---"}</p>
+                      <MembershipBadges user={user} />
                     </GlassBox>
                   </div>
                 ))}
@@ -260,7 +383,7 @@ const UserManagement = () => {
               <div className="space-y-3">
                 {users.map((user, index) => (
                   <div
-                    key={user.counter}
+                    key={user.user_id}
                     className="animate-slide-up"
                     style={{ animationDelay: `${index * 30}ms` }}
                   >
@@ -286,6 +409,7 @@ const UserManagement = () => {
                             label="نام" 
                             value={`${user.first_name || ''} ${user.last_name || ''}`} 
                           />
+                          <MembershipBadges user={user} />
                           <DataBlock label="شناسه" value={user.user_id} dir="ltr" />
                           <DataBlock label="نام کاربری" value={`@${user.username || '---'}`} dir="ltr" />
                           <DataBlock label="تلفن" value={user.phone_number || '---'} dir="ltr" />
@@ -353,96 +477,108 @@ const UserManagement = () => {
       <GlassModal
         isOpen={isFilterOpen}
         onClose={() => setIsFilterOpen(false)}
-        title="جست و جو و فیلتر پیشرفته"
+        title="جست‌وجو و فیلتر کاربران"
       >
-        <div className="space-y-4 max-h-[60vh] overflow-y-auto overscroll-contain pb-2">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-silver">نام (کوچک/بزرگ)</label>
-            <Input
-              type="text"
-              value={filters.name}
-              onChange={(e) => setFilters((prev) => ({ ...prev, name: e.target.value }))}
-              placeholder="جست و جو در نام ها"
-              className="bg-secondary/50 border-silver-light/50 text-charcoal rounded-xl"
-            />
-          </div>
+        <div className="max-h-[65vh] overflow-y-auto overscroll-contain pb-2">
+          <Tabs value={filterMode} onValueChange={setFilterMode} dir="rtl">
+            <TabsList className="mb-4 grid w-full grid-cols-2">
+              <TabsTrigger value="simple">فیلترهای ساده</TabsTrigger>
+              <TabsTrigger value="advanced">فیلترهای پیشرفته</TabsTrigger>
+            </TabsList>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-silver">شناسه عددی (User ID)</label>
-            <Input
-              type="number"
-              value={filters.userId}
-              onChange={(e) => setFilters((prev) => ({ ...prev, userId: e.target.value }))}
-              placeholder="مثلا: 12345678"
-              className="bg-secondary/50 border-silver-light/50 text-charcoal rounded-xl"
-              dir="ltr"
-            />
-          </div>
+            <TabsContent value="simple" className="space-y-4">
+              <p className="text-xs text-silver">برای جست‌وجوی سریع از موارد پرکاربرد زیر استفاده کنید.</p>
+              <label className="block space-y-2">
+                <span className="text-sm font-medium text-silver">جست‌وجوی عمومی</span>
+                <Input value={filters.search ?? ""} onChange={(e) => setFilter("search", e.target.value)} placeholder="نام، شماره تلفن، کد حسابداری، کشور و اطلاعات هیلفن" className="rounded-xl bg-secondary/50" />
+              </label>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-silver">شناسه عددی تلگرام</span>
+                  <Input type="number" dir="ltr" value={filters.user_id ?? ""} onChange={(e) => setFilter("user_id", e.target.value)} placeholder="مثلاً 12345678" className="rounded-xl bg-secondary/50" />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-silver">نام کاربری تلگرام</span>
+                  <Input dir="ltr" value={filters.username_contains ?? ""} onChange={(e) => setFilter("username_contains", e.target.value.replace(/^@/, ""))} placeholder="بدون @" className="rounded-xl bg-secondary/50" />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-silver">شماره تلفن</span>
+                  <Input dir="ltr" value={filters.phone_number_contains ?? ""} onChange={(e) => setFilter("phone_number_contains", e.target.value)} placeholder="تمام یا بخشی از شماره" className="rounded-xl bg-secondary/50" />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-medium text-silver">کشور</span>
+                  <Input value={filters.country_contains ?? ""} onChange={(e) => setFilter("country_contains", e.target.value)} placeholder="تمام یا بخشی از نام کشور" className="rounded-xl bg-secondary/50" />
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  ["is_ban", "وضعیت مسدودی", "مسدود", "فعال"],
+                  ["is_registered", "وضعیت ثبت‌نام", "ثبت‌نام‌شده", "ثبت‌نام‌نشده"],
+                  ["is_in_eurobot", "عضویت یوروبات", "عضو است", "عضو نیست"],
+                  ["is_in_hilfen_bot", "عضویت هیلفن", "عضو است", "عضو نیست"],
+                ].map(([param, label, trueLabel, falseLabel]) => (
+                  <label key={param} className="space-y-2">
+                    <span className="text-sm font-medium text-silver">{label}</span>
+                    <select value={filters[param] ?? ""} onChange={(e) => setFilter(param, e.target.value)} className="h-10 w-full rounded-xl border border-silver-light/50 bg-secondary/50 px-3 text-charcoal">
+                      <option value="">همه</option><option value="true">{trueLabel}</option><option value="false">{falseLabel}</option>
+                    </select>
+                  </label>
+                ))}
+              </div>
+            </TabsContent>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-silver">نام کاربری (Username)</label>
-            <Input
-              type="text"
-              value={filters.username}
-              onChange={(e) => setFilters((prev) => ({ ...prev, username: e.target.value }))}
-              placeholder="بدون @"
-              className="bg-secondary/50 border-silver-light/50 text-charcoal rounded-xl"
-              dir="ltr"
-            />
-          </div>
+            <TabsContent value="advanced" className="space-y-4">
+              <div>
+                <p className="text-sm font-medium">ساخت فیلتر پیشرفته</p>
+                <p className="mt-1 text-xs text-silver">نوع شرط را انتخاب کنید، مقدار را وارد کنید و «افزودن» را بزنید. همه شرط‌های افزوده‌شده باید هم‌زمان برقرار باشند.</p>
+              </div>
+              <label className="block space-y-2">
+                <span className="text-sm text-silver">فیلد و نوع شرط</span>
+                <select value={advancedParam} onChange={(e) => { setAdvancedParam(e.target.value); setAdvancedValue(""); }} className="h-10 w-full rounded-xl border border-silver-light/50 bg-secondary/50 px-3 text-charcoal">
+                  {ADVANCED_FILTER_OPTIONS.map((option) => <option key={option.param} value={option.param}>{option.label}</option>)}
+                </select>
+              </label>
+              <div className="flex items-end gap-2">
+                <label className="flex-1 space-y-2">
+                  <span className="text-sm text-silver">مقدار</span>
+                  {selectedAdvancedOption?.choices ? (
+                    <select value={advancedValue} onChange={(e) => setAdvancedValue(e.target.value)} className="h-10 w-full rounded-xl border border-silver-light/50 bg-secondary/50 px-3 text-charcoal">
+                      <option value="">انتخاب کنید</option>
+                      {selectedAdvancedOption.choices.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
+                    </select>
+                  ) : (
+                    <Input type={selectedAdvancedOption?.type ?? "text"} step={selectedAdvancedOption?.type === "number" || selectedAdvancedOption?.type === "datetime-local" ? "1" : undefined} dir={selectedAdvancedOption?.type === "number" || selectedAdvancedOption?.type === "datetime-local" ? "ltr" : "rtl"} value={advancedValue} onChange={(e) => setAdvancedValue(e.target.value)} className="rounded-xl bg-secondary/50" />
+                  )}
+                  {selectedAdvancedOption?.zeroLabel && (
+                    <button type="button" onClick={addAdvancedZeroValue} className="text-xs text-charcoal underline underline-offset-4">
+                      {selectedAdvancedOption.zeroLabel}
+                    </button>
+                  )}
+                </label>
+                <Button type="button" variant="outline" onClick={addAdvancedFilter} disabled={!advancedValue} className="rounded-xl">
+                  <Plus className="ml-1 h-4 w-4" /> افزودن
+                </Button>
+              </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-silver">شماره تلفن</label>
-            <Input
-              type="text"
-              value={filters.phoneNumber}
-              onChange={(e) => setFilters((prev) => ({ ...prev, phoneNumber: e.target.value }))}
-              placeholder="جست و جو شماره"
-              className="bg-secondary/50 border-silver-light/50 text-charcoal rounded-xl"
-              dir="ltr"
-            />
-          </div>
+              <div className="space-y-2">
+                <p className="text-sm font-medium">شرط‌های فعال ({activeFilters.length})</p>
+                {activeFilters.length === 0 ? (
+                  <p className="rounded-xl border border-dashed p-3 text-center text-xs text-silver">هنوز شرطی اضافه نشده است.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {activeFilters.map(([param, value]) => (
+                      <div key={param} className="flex items-center justify-between gap-3 rounded-xl border bg-secondary/30 p-3 text-sm">
+                        <div><p className="font-medium">{advancedOptionByParam[param]?.label ?? param}</p><p className="mt-1 break-all text-xs text-silver" dir="auto">{displayFilterValue(param, value)}</p></div>
+                        <button type="button" onClick={() => removeFilter(param)} aria-label="حذف شرط" className="rounded-full p-1 hover:bg-secondary"><X className="h-4 w-4" /></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-silver">کشور</label>
-            <Input
-              type="text"
-              value={filters.country}
-              onChange={(e) => setFilters((prev) => ({ ...prev, country: e.target.value }))}
-              placeholder="نام کشور"
-              className="bg-secondary/50 border-silver-light/50 text-charcoal rounded-xl"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-silver">وضعیت بن</label>
-              <select
-                value={filters.isBanned}
-                onChange={(e) => setFilters((prev) => ({ ...prev, isBanned: e.target.value }))}
-                className="w-full h-10 px-3 bg-secondary/50 border border-silver-light/50 text-charcoal rounded-xl focus:outline-none"
-              >
-                <option value="">همه</option>
-                <option value="true">بن شده</option>
-                <option value="false">فعال</option>
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-silver">وضعیت ثبت‌نام</label>
-              <select
-                value={filters.isRegistered}
-                onChange={(e) => setFilters((prev) => ({ ...prev, isRegistered: e.target.value }))}
-                className="w-full h-10 px-3 bg-secondary/50 border border-silver-light/50 text-charcoal rounded-xl focus:outline-none"
-              >
-                <option value="">همه</option>
-                <option value="true">ثبت‌نام شده</option>
-                <option value="false">ثبت‌نام نشده</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="flex gap-3 pt-4 sticky bottom-0 bg-transparent">
+          <div className="sticky bottom-0 mt-4 flex gap-3 border-t bg-white/95 pt-4">
             <Button variant="gold" className="flex-1 rounded-xl" onClick={handleApplyFilters}>
               اعمال فیلتر
             </Button>
@@ -457,3 +593,11 @@ const UserManagement = () => {
 };
 
 export default UserManagement;
+
+const MembershipBadges = ({ user }: { user: User }) => {
+  const kind = getMembershipKind(user);
+  if (kind === "both") return <div className="flex gap-1 mt-2"><Badge variant="secondary">Eurobot</Badge><Badge variant="outline">Hilfen</Badge></div>;
+  if (kind === "eurobot") return <Badge variant="secondary" className="mt-2">Eurobot</Badge>;
+  if (kind === "hilfen") return <Badge variant="outline" className="mt-2">Hilfen</Badge>;
+  return <Badge variant="outline" className="mt-2 opacity-60">بدون ربات</Badge>;
+};

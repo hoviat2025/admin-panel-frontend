@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Users, Zap, BarChart3, Brain } from "lucide-react";
+import { Users, Zap, BarChart3, Brain, History } from "lucide-react";
 import { Header } from "@/components/Header";
 import { GlassBox } from "@/components/GlassBox";
 
@@ -13,7 +13,15 @@ interface DashboardItem {
 }
 
 const dashboardItems: DashboardItem[] = [
-  {
+{
+id: "audit-history",
+title: "تاریخچه فعالیت مدیران",
+description: "مشاهده تغییرات انجام‌شده توسط مدیران و درخواست‌های همگام‌سازی",
+icon: History,
+path: "/audit-history",
+disabled: false,
+},
+{
     id: "users",
     title: "مدیریت کاربران",
     description: "مشاهده و جست و جو و فیلتر و ویرایش در بین کاربران",

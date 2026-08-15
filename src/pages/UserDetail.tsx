@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { Pencil, Loader2, AlertTriangle, Check, Phone, Calendar, Globe, User as UserIcon, AtSign, Hash } from "lucide-react";
 import { Header } from "@/components/Header";
 import { GlassBox } from "@/components/GlassBox";
@@ -7,13 +7,108 @@ import { FloatingActionButton } from "@/components/FloatingActionButton";
 import { GlassModal } from "@/components/GlassModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { User, getProfileImageUrl } from "@/types/user";
 import { API_BASE_URL } from "@/config";
+import { Badge } from "@/components/ui/badge";
+import { dateTimeLocalToUnixSeconds, formatDateTime, formatUnixDateTime, getMembershipKind, getSyncStatus, parseMaybeJson, unixSecondsToDateTimeLocal } from "@/lib/userDisplay";
+
+type EditableUserKey =
+  | "counter" | "accounting_code" | "username" | "first_name" | "last_name" | "nickname"
+  | "phone_number" | "whatsapp_number" | "country" | "password" | "mode"
+  | "is_ban" | "is_registered" | "chat_not_found" | "is_in_eurobot" | "is_in_hilfen_bot"
+  | "score" | "ban_time" | "join_date" | "profile_path" | "telegram_message_id"
+  | "group_message_id" | "public_message_id" | "public_group_message_id"
+  | "hilfen_id" | "hilfen_status" | "hilfen_date_join" | "hilfen_command" | "hilfen_data"
+  | "hilfen_id_card_photo" | "hilfen_all_projects" | "hilfen_all_projects_done"
+  | "hilfen_limits_time" | "hilfen_message_id" | "hilfen_group_message_id";
+
+type EditData = Record<EditableUserKey, string | boolean>;
+
+type EditField = {
+  key: EditableUserKey;
+  label: string;
+  type?: "text" | "number" | "password" | "datetime-local";
+  dir?: "rtl" | "ltr";
+  multiline?: boolean;
+  hint?: string;
+};
+
+const profileFields: EditField[] = [
+  { key: "counter", label: "شماره کاربر یوروبات", type: "number", dir: "ltr" },
+  { key: "accounting_code", label: "کد حسابداری", dir: "ltr" },
+  { key: "first_name", label: "نام" },
+  { key: "last_name", label: "نام خانوادگی" },
+  { key: "nickname", label: "نام مستعار" },
+  { key: "username", label: "نام کاربری تلگرام", dir: "ltr", hint: "بدون علامت @" },
+  { key: "phone_number", label: "شماره تلفن", dir: "ltr" },
+  { key: "whatsapp_number", label: "شماره واتساپ", dir: "ltr" },
+  { key: "country", label: "کشور" },
+  { key: "password", label: "رمز عبور کاربر", type: "password", dir: "ltr" },
+  { key: "mode", label: "حالت", dir: "ltr" },
+  { key: "join_date", label: "تاریخ و زمان عضویت", type: "datetime-local", dir: "ltr" },
+  { key: "profile_path", label: "مسیر تصویر پروفایل", dir: "ltr" },
+];
+
+const statusNumberFields: EditField[] = [
+  { key: "score", label: "امتیاز", type: "number", dir: "ltr" },
+  { key: "ban_time", label: "تاریخ و زمان مسدودی", type: "datetime-local", dir: "ltr", hint: "خالی یعنی تاریخ مسدودی ثبت نشده است" },
+];
+
+const booleanFields: { key: EditableUserKey; label: string; trueLabel: string; falseLabel: string }[] = [
+  { key: "is_ban", label: "وضعیت مسدودی", trueLabel: "مسدود", falseLabel: "فعال" },
+  { key: "is_registered", label: "وضعیت ثبت‌نام", trueLabel: "ثبت‌نام‌شده", falseLabel: "ثبت‌نام‌نشده" },
+  { key: "chat_not_found", label: "دسترسی به گفتگوی تلگرام", trueLabel: "گفتگو پیدا نشده", falseLabel: "گفتگو در دسترس است" },
+  { key: "is_in_eurobot", label: "عضویت یوروبات", trueLabel: "عضو است", falseLabel: "عضو نیست" },
+  { key: "is_in_hilfen_bot", label: "عضویت هیلفن", trueLabel: "عضو است", falseLabel: "عضو نیست" },
+];
+
+const messageFields: EditField[] = [
+  { key: "telegram_message_id", label: "شناسه پیام تلگرام", dir: "ltr" },
+  { key: "group_message_id", label: "شناسه پیام گروه", dir: "ltr" },
+  { key: "public_message_id", label: "شناسه پیام کانال عمومی", dir: "ltr" },
+  { key: "public_group_message_id", label: "شناسه پیام گروه عمومی", dir: "ltr" },
+];
+
+const hilfenFields: EditField[] = [
+  { key: "hilfen_id", label: "شناسه هیلفن", type: "number", dir: "ltr" },
+  { key: "hilfen_status", label: "وضعیت هیلفن" },
+  { key: "hilfen_date_join", label: "تاریخ و زمان عضویت هیلفن", type: "datetime-local", dir: "ltr" },
+  { key: "hilfen_command", label: "دستور هیلفن", dir: "ltr" },
+  { key: "hilfen_data", label: "اطلاعات هیلفن", multiline: true, dir: "ltr", hint: "متن یا JSON ذخیره‌شده برای هیلفن" },
+  { key: "hilfen_id_card_photo", label: "مسیر تصویر کارت شناسایی هیلفن", dir: "ltr" },
+  { key: "hilfen_all_projects", label: "تعداد کل پروژه‌های هیلفن", type: "number", dir: "ltr" },
+  { key: "hilfen_all_projects_done", label: "تعداد پروژه‌های تکمیل‌شده هیلفن", type: "number", dir: "ltr" },
+  { key: "hilfen_limits_time", label: "تاریخ و زمان محدودیت هیلفن", type: "datetime-local", dir: "ltr", hint: "خالی یعنی بدون تاریخ محدودیت" },
+  { key: "hilfen_message_id", label: "شناسه پیام هیلفن", type: "number", dir: "ltr" },
+  { key: "hilfen_group_message_id", label: "شناسه پیام گروه هیلفن", type: "number", dir: "ltr" },
+];
+
+const allEditFields = [...profileFields, ...statusNumberFields, ...messageFields, ...hilfenFields];
+const numericEditKeys = new Set(allEditFields.filter((field) => field.type === "number").map((field) => field.key));
+const unixDateEditKeys = new Set(allEditFields.filter((field) => field.type === "datetime-local").map((field) => field.key));
+const zeroWhenEmptyUnixKeys = new Set<EditableUserKey>(["ban_time", "hilfen_limits_time"]);
+
+const createEditData = (user?: User): EditData => {
+  const data = {} as EditData;
+  allEditFields.forEach(({ key }) => {
+    const value = user?.[key];
+    data[key] = unixDateEditKeys.has(key)
+      ? unixSecondsToDateTimeLocal(value as string | number | null | undefined)
+      : value === null || value === undefined ? "" : String(value);
+  });
+  booleanFields.forEach(({ key }) => {
+    data[key] = user ? Boolean(user[key]) : false;
+  });
+  return data;
+};
 
 const UserDetail = () => {
   const { userId } = useParams<{ userId: string }>();
+  const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   
   // Loading states
@@ -22,18 +117,7 @@ const UserDetail = () => {
   
   const [isEditOpen, setIsEditOpen] = useState(false);
   
-  const [editData, setEditData] = useState({
-    first_name: "",
-    last_name: "",
-    nickname: "",
-    username: "",
-    phone_number: "",
-    whatsapp_number: "",
-    country: "",
-    score: 0,
-    is_ban: false,
-    is_registered: true,
-  });
+  const [editData, setEditData] = useState<EditData>(() => createEditData());
 
   const { token } = useAuth();
   const { toast } = useToast();
@@ -63,19 +147,7 @@ const UserDetail = () => {
         const foundUser = json.data;
         setUser(foundUser);
         
-        // Populate edit form with current data
-        setEditData({
-          first_name: foundUser.first_name || "",
-          last_name: foundUser.last_name || "",
-          nickname: foundUser.nickname || "",
-          username: foundUser.username || "",
-          phone_number: foundUser.phone_number || "",
-          whatsapp_number: foundUser.whatsapp_number || "",
-          country: foundUser.country || "",
-          score: foundUser.score || 0,
-          is_ban: foundUser.is_ban || false,
-          is_registered: foundUser.is_registered || false,
-        });
+        setEditData(createEditData(foundUser));
       } else {
         toast({
           variant: "destructive",
@@ -100,12 +172,24 @@ const UserDetail = () => {
     setIsSaving(true);
 
     try {
-      // Construct the payload
-      // We convert userId to integer as most backends expect ID as number in JSON
-      const payload = {
-        user_id: parseInt(user.user_id) || user.user_id, 
-        ...editData
+      const payload: Record<string, string | number | boolean | null> = {
+        user_id: user.user_id,
       };
+      Object.entries(editData).forEach(([key, value]) => {
+        if (typeof value === "boolean") {
+          payload[key] = value;
+        } else if (numericEditKeys.has(key as EditableUserKey)) {
+          payload[key] = value.trim() === "" ? null : Number(value);
+        } else if (unixDateEditKeys.has(key as EditableUserKey)) {
+          payload[key] = value
+            ? dateTimeLocalToUnixSeconds(value)
+            : zeroWhenEmptyUnixKeys.has(key as EditableUserKey) && user[key as "ban_time" | "hilfen_limits_time"] !== null
+              ? 0
+              : null;
+        } else {
+          payload[key] = value;
+        }
+      });
 
       const response = await fetch(`${API_BASE_URL}/admin/users-management/update`, {
         method: "PATCH",
@@ -121,6 +205,7 @@ const UserDetail = () => {
       if (response.ok && json.data) {
         // Update local state with the server response (Source of Truth)
         setUser(json.data);
+        setEditData(createEditData(json.data));
         setIsEditOpen(false);
         toast({
           title: "موفقیت",
@@ -148,28 +233,6 @@ const UserDetail = () => {
   };
 
   // --- Formatters ---
-  const formatDate = (timestamp: string | number | null) => {
-    if (!timestamp) return "-";
-    const date = new Date(Number(timestamp) * 1000);
-    return new Intl.DateTimeFormat("fa-IR", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    }).format(date);
-  };
-
-  const formatDateTime = (isoString: string | null) => {
-    if (!isoString) return "-";
-    const date = new Date(isoString);
-    return new Intl.DateTimeFormat("fa-IR", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(date);
-  };
-
   if (isLoading) {
     return (
       <div className="min-h-screen">
@@ -210,6 +273,42 @@ const UserDetail = () => {
     </div>
   );
 
+  const setEditValue = (key: EditableUserKey, value: string | boolean) => {
+    setEditData((previous) => ({ ...previous, [key]: value }));
+  };
+
+  const EditInput = ({ field }: { field: EditField }) => {
+    const value = String(editData[field.key] ?? "");
+    return (
+      <label className="block space-y-2">
+        <span className="text-sm font-medium text-silver">{field.label}</span>
+        {field.multiline ? (
+          <Textarea
+            value={value}
+            onChange={(event) => setEditValue(field.key, event.target.value)}
+            className="min-h-28 rounded-xl border-silver-light/50 bg-secondary/50 text-charcoal"
+            dir={field.dir}
+          />
+        ) : (
+          <Input
+            type={field.type ?? "text"}
+            step={field.type === "number" || field.type === "datetime-local" ? "1" : undefined}
+            value={value}
+            onChange={(event) => setEditValue(field.key, event.target.value)}
+            className="rounded-xl border-silver-light/50 bg-secondary/50 text-charcoal"
+            dir={field.dir}
+          />
+        )}
+        {field.hint && <span className="block text-xs text-silver">{field.hint}</span>}
+      </label>
+    );
+  };
+
+  const openEditForm = () => {
+    setEditData(createEditData(user));
+    setIsEditOpen(true);
+  };
+
   return (
     <div className="min-h-screen pb-24">
       <Header />
@@ -249,7 +348,7 @@ const UserDetail = () => {
             <InfoRow icon={AtSign} label="نام کاربری" value={user.username} />
             <InfoRow icon={Phone} label="شماره تلفن" value={user.phone_number} />
             <InfoRow icon={Phone} label="واتساپ" value={user.whatsapp_number} />
-            <InfoRow icon={Calendar} label="تاریخ عضویت" value={formatDate(user.join_date)} />
+            <InfoRow icon={Calendar} label="تاریخ عضویت" value={formatUnixDateTime(user.join_date)} />
           </GlassBox>
         </div>
 
@@ -257,11 +356,52 @@ const UserDetail = () => {
           <GlassBox className="mb-6">
             <h2 className="font-bold text-charcoal mb-4">اطلاعات سیستم</h2>
             <InfoRow label="امتیاز" value={user.score} />
+            <InfoRow label="تاریخ مسدودی" value={user.ban_time > 0 ? formatUnixDateTime(user.ban_time) : "ثبت نشده"} />
             <InfoRow label="وضعیت ثبت نام" value={user.is_registered ? "ثبت نام شده" : "ثبت نام نشده"} />
             <InfoRow label="حالت" value={user.mode} />
             <InfoRow label="کد حسابداری" value={user.accounting_code} />
             <InfoRow label="آخرین به‌روزرسانی" value={formatDateTime(user.updated_at)} />
             <InfoRow label="به‌روزرسانی کانال" value={formatDateTime(user.channel_updated_at)} />
+            <InfoRow label="وضعیت همگام‌سازی" value={getSyncStatus(user)} />
+            <InfoRow label="عضویت" value={getMembershipKind(user)} />
+          </GlassBox>
+        </div>
+
+        <div className="animate-slide-up" style={{ animationDelay: "250ms" }}>
+          <GlassBox className="mb-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold">تاریخچه فعالیت مدیران</h2>
+              <Button variant="outline" onClick={() => navigate(`/audit-history?target_user_id=${userId}`)}>مشاهده تغییرات کاربر</Button>
+            </div>
+          </GlassBox>
+          <GlassBox className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-charcoal">اطلاعات هیلفن</h2>
+              <div className="flex gap-1">
+                {user.is_in_hilfen_bot && <Badge variant="outline">عضو هیلفن</Badge>}
+                {user.is_in_eurobot && <Badge variant="secondary">عضو یوروبات</Badge>}
+              </div>
+            </div>
+            {!user.is_in_hilfen_bot ? (
+              <p className="text-sm text-silver">این کاربر عضو هیلفن نیست.</p>
+            ) : (
+              <>
+                <InfoRow label="شناسه هیلفن" value={user.hilfen_id} />
+                <InfoRow label="وضعیت" value={user.hilfen_status} />
+                <InfoRow label="تاریخ عضویت" value={formatUnixDateTime(user.hilfen_date_join)} />
+                <InfoRow label="دستور" value={user.hilfen_command} />
+                <InfoRow label="پروژه‌ها" value={user.hilfen_all_projects} />
+                <InfoRow label="پروژه‌های انجام‌شده" value={user.hilfen_all_projects_done} />
+                <InfoRow label="تاریخ محدودیت" value={user.hilfen_limits_time && user.hilfen_limits_time > 0 ? formatUnixDateTime(user.hilfen_limits_time) : "بدون محدودیت"} />
+                <InfoRow label="مرجع کارت شناسایی" value={user.hilfen_id_card_photo} />
+                <InfoRow label="شناسه پیام هیلفن" value={user.hilfen_message_id} />
+                <InfoRow label="شناسه پیام گروه هیلفن" value={user.hilfen_group_message_id} />
+                <div className="mt-3 rounded-xl bg-secondary/40 p-3">
+                  <p className="text-xs text-silver mb-2">داده هیلفن</p>
+                  <pre className="text-xs text-charcoal whitespace-pre-wrap break-words max-h-48 overflow-auto" dir="ltr">{parseMaybeJson(user.hilfen_data)}</pre>
+                </div>
+              </>
+            )}
           </GlassBox>
         </div>
 
@@ -277,7 +417,7 @@ const UserDetail = () => {
         </div>
       </main>
 
-      <FloatingActionButton onClick={() => setIsEditOpen(true)}>
+      <FloatingActionButton onClick={openEditForm}>
         <Pencil className="w-6 h-6 text-charcoal" />
       </FloatingActionButton>
 
@@ -287,122 +427,65 @@ const UserDetail = () => {
         onClose={() => setIsEditOpen(false)}
         title="ویرایش اطلاعات"
       >
-        <div className="space-y-4 max-h-[60vh] overflow-y-auto overscroll-contain">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-silver">نام</label>
-              <Input
-                type="text"
-                value={editData.first_name}
-                onChange={(e) => setEditData((prev) => ({ ...prev, first_name: e.target.value }))}
-                className="bg-secondary/50 border-silver-light/50 text-charcoal rounded-xl"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-silver">نام خانوادگی</label>
-              <Input
-                type="text"
-                value={editData.last_name}
-                onChange={(e) => setEditData((prev) => ({ ...prev, last_name: e.target.value }))}
-                className="bg-secondary/50 border-silver-light/50 text-charcoal rounded-xl"
-              />
-            </div>
+        <div className="max-h-[65vh] overflow-y-auto overscroll-contain">
+          <div className="mb-4 rounded-xl border border-silver-light/50 bg-secondary/30 p-3 text-xs text-silver">
+            شناسه عددی تلگرام: <span className="font-mono text-charcoal" dir="ltr">{user.user_id}</span>
+            <span className="mr-2">این شناسه و زمان‌های ثبت تغییرات قابل ویرایش نیستند.</span>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-silver">نام مستعار</label>
-            <Input
-              type="text"
-              value={editData.nickname}
-              onChange={(e) => setEditData((prev) => ({ ...prev, nickname: e.target.value }))}
-              className="bg-secondary/50 border-silver-light/50 text-charcoal rounded-xl"
-            />
-          </div>
+          <Tabs defaultValue="profile" dir="rtl">
+            <TabsList className="mb-4 grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4">
+              <TabsTrigger value="profile">اطلاعات اصلی</TabsTrigger>
+              <TabsTrigger value="status">وضعیت</TabsTrigger>
+              <TabsTrigger value="messages">پیام‌ها</TabsTrigger>
+              <TabsTrigger value="hilfen">هیلفن</TabsTrigger>
+            </TabsList>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-silver">نام کاربری</label>
-            <Input
-              type="text"
-              value={editData.username}
-              onChange={(e) => setEditData((prev) => ({ ...prev, username: e.target.value }))}
-              className="bg-secondary/50 border-silver-light/50 text-charcoal rounded-xl"
-              dir="ltr"
-            />
-          </div>
+            <TabsContent value="profile" className="space-y-4">
+              <p className="text-xs text-silver">خالی گذاشتن یک فیلد اختیاری، مقدار آن را پاک می‌کند.</p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {profileFields.map((field) => <EditInput key={field.key} field={field} />)}
+              </div>
+            </TabsContent>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-silver">شماره تلفن</label>
-              <Input
-                type="text"
-                value={editData.phone_number}
-                onChange={(e) => setEditData((prev) => ({ ...prev, phone_number: e.target.value }))}
-                className="bg-secondary/50 border-silver-light/50 text-charcoal rounded-xl"
-                dir="ltr"
-              />
-            </div>
+            <TabsContent value="status" className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {statusNumberFields.map((field) => <EditInput key={field.key} field={field} />)}
+                {booleanFields.map((field) => (
+                  <label key={field.key} className="block space-y-2">
+                    <span className="text-sm font-medium text-silver">{field.label}</span>
+                    <select
+                      value={editData[field.key] === true ? "true" : "false"}
+                      onChange={(event) => setEditValue(field.key, event.target.value === "true")}
+                      className="h-10 w-full rounded-xl border border-silver-light/50 bg-secondary/50 px-3 text-charcoal"
+                    >
+                      <option value="true">{field.trueLabel}</option>
+                      <option value="false">{field.falseLabel}</option>
+                    </select>
+                  </label>
+                ))}
+              </div>
+            </TabsContent>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-silver">شماره واتساپ</label>
-              <Input
-                type="text"
-                value={editData.whatsapp_number}
-                onChange={(e) => setEditData((prev) => ({ ...prev, whatsapp_number: e.target.value }))}
-                className="bg-secondary/50 border-silver-light/50 text-charcoal rounded-xl"
-                dir="ltr"
-              />
-            </div>
-          </div>
+            <TabsContent value="messages" className="space-y-4">
+              <p className="text-xs text-silver">شناسه‌های مربوط به پیام‌های کاربر در کانال‌ها و گروه‌ها.</p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {messageFields.map((field) => <EditInput key={field.key} field={field} />)}
+              </div>
+            </TabsContent>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-silver">کشور</label>
-            <Input
-              type="text"
-              value={editData.country}
-              onChange={(e) => setEditData((prev) => ({ ...prev, country: e.target.value }))}
-              className="bg-secondary/50 border-silver-light/50 text-charcoal rounded-xl"
-            />
-          </div>
+            <TabsContent value="hilfen" className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {hilfenFields.map((field) => (
+                  <div key={field.key} className={field.multiline ? "sm:col-span-2" : ""}>
+                    <EditInput field={field} />
+                  </div>
+                ))}
+              </div>
+            </TabsContent>
+          </Tabs>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-silver">امتیاز</label>
-            <Input
-              type="number"
-              value={editData.score}
-              onChange={(e) => setEditData((prev) => ({ ...prev, score: parseInt(e.target.value) || 0 }))}
-              className="bg-secondary/50 border-silver-light/50 text-charcoal rounded-xl"
-              dir="ltr"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-silver">وضعیت بن</label>
-              <select
-                value={editData.is_ban ? "true" : "false"}
-                onChange={(e) => setEditData((prev) => ({ ...prev, is_ban: e.target.value === "true" }))}
-                className="w-full h-10 px-3 bg-secondary/50 border border-silver-light/50 text-charcoal rounded-xl"
-              >
-                <option value="false">فعال</option>
-                <option value="true">بن شده</option>
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-silver">وضعیت ثبت‌نام</label>
-              <select
-                value={editData.is_registered ? "true" : "false"}
-                onChange={(e) => setEditData((prev) => ({ ...prev, is_registered: e.target.value === "true" }))}
-                className="w-full h-10 px-3 bg-secondary/50 border border-silver-light/50 text-charcoal rounded-xl"
-              >
-                <option value="true">ثبت‌نام شده</option>
-                <option value="false">ثبت‌نام نشده</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="flex gap-3 pt-4">
+          <div className="sticky bottom-0 mt-5 flex gap-3 border-t bg-white/95 pt-4">
             <Button 
               variant="gold" 
               className="flex-1 rounded-xl" 
@@ -415,6 +498,9 @@ const UserDetail = () => {
                  <Check className="w-4 h-4 ml-2" />
               )}
               ذخیره تغییرات
+            </Button>
+            <Button variant="outline" className="rounded-xl" onClick={() => setIsEditOpen(false)} disabled={isSaving}>
+              انصراف
             </Button>
           </div>
         </div>
