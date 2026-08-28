@@ -35,6 +35,7 @@ type EditField = {
   dir?: "rtl" | "ltr";
   multiline?: boolean;
   hint?: string;
+  disabled?: boolean;
 };
 
 const profileFields: EditField[] = [
@@ -67,10 +68,10 @@ const booleanFields: { key: EditableUserKey; label: string; trueLabel: string; f
 ];
 
 const messageFields: EditField[] = [
-  { key: "telegram_message_id", label: "شناسه پیام تلگرام", dir: "ltr" },
-  { key: "group_message_id", label: "شناسه پیام گروه", dir: "ltr" },
-  { key: "public_message_id", label: "شناسه پیام کانال عمومی", dir: "ltr" },
-  { key: "public_group_message_id", label: "شناسه پیام گروه عمومی", dir: "ltr" },
+  { key: "telegram_message_id", label: "شناسه پیام تلگرام", dir: "ltr", disabled: true, hint: "این فیلد قابل ویرایش نیست" },
+  { key: "group_message_id", label: "شناسه پیام گروه", dir: "ltr", disabled: true, hint: "این فیلد قابل ویرایش نیست" },
+  { key: "public_message_id", label: "شناسه پیام کانال عمومی", dir: "ltr", disabled: true, hint: "این فیلد قابل ویرایش نیست" },
+  { key: "public_group_message_id", label: "شناسه پیام گروه عمومی", dir: "ltr", disabled: true, hint: "این فیلد قابل ویرایش نیست" },
 ];
 
 const hilfenFields: EditField[] = [
@@ -83,14 +84,22 @@ const hilfenFields: EditField[] = [
   { key: "hilfen_all_projects", label: "تعداد کل پروژه‌های هیلفن", type: "number", dir: "ltr" },
   { key: "hilfen_all_projects_done", label: "تعداد پروژه‌های تکمیل‌شده هیلفن", type: "number", dir: "ltr" },
   { key: "hilfen_limits_time", label: "تاریخ و زمان محدودیت هیلفن", type: "datetime-local", dir: "ltr", hint: "خالی یعنی بدون تاریخ محدودیت" },
-  { key: "hilfen_message_id", label: "شناسه پیام هیلفن", type: "number", dir: "ltr" },
-  { key: "hilfen_group_message_id", label: "شناسه پیام گروه هیلفن", type: "number", dir: "ltr" },
+  { key: "hilfen_message_id", label: "شناسه پیام هیلفن", type: "number", dir: "ltr", disabled: true, hint: "این فیلد قابل ویرایش نیست" },
+  { key: "hilfen_group_message_id", label: "شناسه پیام گروه هیلفن", type: "number", dir: "ltr", disabled: true, hint: "این فیلد قابل ویرایش نیست" },
 ];
 
 const allEditFields = [...profileFields, ...statusNumberFields, ...messageFields, ...hilfenFields];
 const numericEditKeys = new Set(allEditFields.filter((field) => field.type === "number").map((field) => field.key));
 const unixDateEditKeys = new Set(allEditFields.filter((field) => field.type === "datetime-local").map((field) => field.key));
 const zeroWhenEmptyUnixKeys = new Set<EditableUserKey>(["ban_time", "hilfen_limits_time"]);
+const readOnlyEditKeys = new Set<EditableUserKey>([
+  "telegram_message_id",
+  "group_message_id",
+  "public_message_id",
+  "public_group_message_id",
+  "hilfen_message_id",
+  "hilfen_group_message_id",
+]);
 
 const createEditData = (user?: User): EditData => {
   const data = {} as EditData;
@@ -125,6 +134,7 @@ const EditInput = ({
         onChange={(event) => onChange(event.target.value)}
         className="min-h-28 w-full min-w-0 rounded-xl border-silver-light/50 bg-secondary/50 text-charcoal"
         dir={field.dir}
+        disabled={field.disabled}
       />
     ) : (
       <Input
@@ -132,8 +142,9 @@ const EditInput = ({
         step={field.type === "number" || field.type === "datetime-local" ? "1" : undefined}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full min-w-0 rounded-xl border-silver-light/50 bg-secondary/50 text-charcoal"
+        className="w-full min-w-0 rounded-xl border-silver-light/50 bg-secondary/50 text-charcoal disabled:cursor-not-allowed disabled:opacity-60"
         dir={field.dir}
+        disabled={field.disabled}
       />
     )}
     {field.hint && <span className="block text-xs text-silver">{field.hint}</span>}
@@ -210,6 +221,7 @@ const UserDetail = () => {
         user_id: user.user_id,
       };
       Object.entries(editData).forEach(([key, value]) => {
+        if (readOnlyEditKeys.has(key as EditableUserKey)) return;
         if (typeof value === "boolean") {
           payload[key] = value;
         } else if (numericEditKeys.has(key as EditableUserKey)) {
