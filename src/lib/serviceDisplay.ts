@@ -11,9 +11,9 @@ import {
 /**
  * Presentation helpers for the service directory.
  *
- * The three Persian-relevance flags are deliberately labelled as three separate
- * facts, with help text, because collapsing them into one "Persian" idea is
- * exactly the confusion this milestone is meant to prevent.
+ * The four Iranian/Persian relevance signals are deliberately labelled as four
+ * separate facts, with help text, because collapsing them into one "Persian"
+ * idea is exactly the confusion this milestone is meant to prevent.
  */
 
 export const STATUS_LABELS: Record<ServiceStatus, string> = {
