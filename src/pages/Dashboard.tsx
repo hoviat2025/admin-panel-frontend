@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Users, Zap, BarChart3, Brain, History } from "lucide-react";
+import { Users, Zap, BarChart3, Brain, History, Store, Tags } from "lucide-react";
 import { Header } from "@/components/Header";
 import { GlassBox } from "@/components/GlassBox";
 
@@ -21,12 +21,28 @@ icon: History,
 path: "/audit-history",
 disabled: false,
 },
-{
+  {
     id: "users",
     title: "مدیریت کاربران",
     description: "مشاهده و جست و جو و فیلتر و ویرایش در بین کاربران",
     icon: Users,
     path: "/users",
+    disabled: false,
+  },
+  {
+    id: "services",
+    title: "مدیریت سرویس‌ها",
+    description: "سرویس‌ها و کسب‌وکارها: جست‌وجو، ایجاد، ویرایش، وضعیت و مالک",
+    icon: Store,
+    path: "/services",
+    disabled: false,
+  },
+  {
+    id: "categories",
+    title: "دسته‌بندی‌ها",
+    description: "ساخت و ویرایش درخت دسته‌بندی سرویس‌ها و انتخاب دسته اصلی",
+    icon: Tags,
+    path: "/categories",
     disabled: false,
   },
   {

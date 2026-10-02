@@ -12,6 +12,9 @@ import UserDetail from "./pages/UserDetail";
 import NotFound from "./pages/NotFound";
 import AuditHistory from "./pages/AuditHistory";
 import Statistics from "./pages/Statistics";
+import ServiceManagement from "./pages/ServiceManagement";
+import ServiceEditor from "./pages/ServiceEditor";
+import CategoryManagement from "./pages/CategoryManagement";
 
 const queryClient = new QueryClient();
 
@@ -61,6 +64,22 @@ const AppRoutes = () => {
       <Route
         path="/stats"
         element={<ProtectedRoute><Statistics /></ProtectedRoute>}
+      />
+      <Route
+        path="/services"
+        element={<ProtectedRoute><ServiceManagement /></ProtectedRoute>}
+      />
+      <Route
+        path="/services/new"
+        element={<ProtectedRoute><ServiceEditor /></ProtectedRoute>}
+      />
+      <Route
+        path="/services/:serviceId"
+        element={<ProtectedRoute><ServiceEditor /></ProtectedRoute>}
+      />
+      <Route
+        path="/categories"
+        element={<ProtectedRoute><CategoryManagement /></ProtectedRoute>}
       />
       <Route path="*" element={<NotFound />} />
     </Routes>
