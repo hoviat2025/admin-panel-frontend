@@ -120,18 +120,19 @@ export async function updateService(id: number, payload: ServiceUpdatePayload): 
  * Save the whole editable aggregate of an existing service in one request.
  *
  * This is what the editor uses for an existing service: one transaction, so a
- * failure cannot leave new contacts with old categories. `expectedUpdatedAt` is
- * the `updated_at` the editor loaded; if another admin saved in the meantime
- * the backend answers 409 instead of overwriting their work.
+ * failure cannot leave new contacts with old categories.
+ *
+ * `payload.expected_updated_at` is the `updated_at` that was loaded and is
+ * mandatory: it is what lets the backend detect that someone else saved in the
+ * meantime and answer 409 instead of overwriting their work.
  */
 export async function saveServiceAggregate(
   id: number,
   payload: ServiceAggregateSavePayload,
-  expectedUpdatedAt?: string | null,
 ): Promise<Service> {
   const body = await request<Service>(`/services/${id}`, {
     method: "PUT",
-    body: JSON.stringify({ ...payload, expected_updated_at: expectedUpdatedAt ?? null }),
+    body: JSON.stringify(payload),
   });
   return body.data;
 }

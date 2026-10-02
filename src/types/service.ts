@@ -13,6 +13,41 @@ export type ServiceStatus = (typeof SERVICE_STATUSES)[number];
 export const CONTACT_TYPES = ["phone", "email", "url", "username", "other"] as const;
 export type ContactType = (typeof CONTACT_TYPES)[number];
 
+/**
+ * Tri-state Iranian/Persian relevance.
+ *
+ * `null` is "not assessed", which is a genuinely different answer from `false`.
+ * Curated and imported data frequently does not know, and showing that as "No"
+ * would both misinform admins and destroy the ability to find the gaps later.
+ */
+export type RelevanceAnswer = true | false | null;
+
+export const RELEVANCE_KEYS = [
+  "persian_owned",
+  "persian_provider",
+  "persian_language",
+  "persian_service",
+] as const;
+export type RelevanceKey = (typeof RELEVANCE_KEYS)[number];
+
+/** What an admin can pick for a relevance signal. */
+export const RELEVANCE_ANSWERS = ["unknown", "yes", "no"] as const;
+export type RelevanceAnswerChoice = (typeof RELEVANCE_ANSWERS)[number];
+
+/** Map the stored tri-state value onto the choice an admin picks. */
+export function relevanceAnswerToChoice(value: RelevanceAnswer): RelevanceAnswerChoice {
+  if (value === true) return "yes";
+  if (value === false) return "no";
+  return "unknown";
+}
+
+/** Map an admin's choice back onto the stored tri-state value. */
+export function relevanceChoiceToAnswer(choice: RelevanceAnswerChoice): RelevanceAnswer {
+  if (choice === "yes") return true;
+  if (choice === "no") return false;
+  return null;
+}
+
 export interface ServiceContact {
   id?: number;
   title: string;
@@ -44,13 +79,18 @@ export interface Service {
   name: string;
   description: string | null;
 
-  persian_owned: boolean;
-  persian_language: boolean;
-  persian_service: boolean;
+  // Tri-state Iranian/Persian relevance. null = not assessed. These describe the
+  // listing and the people connected to it, NOT its location, which is Germany.
+  persian_owned: RelevanceAnswer;
+  persian_provider: RelevanceAnswer;
+  persian_language: RelevanceAnswer;
+  persian_service: RelevanceAnswer;
 
   address: string | null;
   postal_code: string | null;
   city: string | null;
+  /** First-level administrative area; in the German scope, the Bundesland. */
+  state: string | null;
   country: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -104,12 +144,16 @@ export interface ServiceCreatePayload {
   description?: string | null;
   owner_user_id?: number | null;
   show_owner: boolean;
-  persian_owned: boolean;
-  persian_language: boolean;
-  persian_service: boolean;
+  // Tri-state relevance; null means not assessed and is sent as null.
+  persian_owned: RelevanceAnswer;
+  persian_provider: RelevanceAnswer;
+  persian_language: RelevanceAnswer;
+  persian_service: RelevanceAnswer;
   address?: string | null;
   postal_code?: string | null;
   city?: string | null;
+  state?: string | null;
+  /** Defaults to Germany in the admin UI; still overridable. */
   country?: string | null;
   latitude?: number | null;
   longitude?: number | null;
@@ -120,17 +164,26 @@ export interface ServiceCreatePayload {
   categories: ServiceCategoryInput[];
 }
 
+/**
+ * Tri-state relevance for a partial update.
+ *
+ * A key that is present sets that signal, including to `null` ("unknown"); a key
+ * that is absent leaves it alone. This is why the fields are nested rather than
+ * optional at the top level: with optional top-level fields, `null` would be
+ * indistinguishable from "not supplied".
+ */
+export type ServiceRelevanceUpdate = Partial<Record<RelevanceKey, RelevanceAnswer>>;
+
 export interface ServiceUpdatePayload {
   name?: string;
   description?: string | null;
   owner_user_id?: number | null;
   show_owner?: boolean;
-  persian_owned?: boolean;
-  persian_language?: boolean;
-  persian_service?: boolean;
+  relevance?: ServiceRelevanceUpdate;
   address?: string | null;
   postal_code?: string | null;
   city?: string | null;
+  state?: string | null;
   country?: string | null;
   latitude?: number | null;
   longitude?: number | null;
@@ -141,10 +194,12 @@ export interface ServiceUpdatePayload {
 
 /**
  * Full editable state of an existing service, saved in one request/transaction.
- * Same as create, plus the optimistic-concurrency token.
+ * Same as create, plus the mandatory optimistic-concurrency token: the
+ * `updated_at` that was loaded. The backend refuses the save with 409 if the row
+ * moved on since.
  */
 export interface ServiceAggregateSavePayload extends ServiceCreatePayload {
-  expected_updated_at?: string | null;
+  expected_updated_at: string;
 }
 
 export interface CategoryCreatePayload {
@@ -172,15 +227,24 @@ export interface PaginationMeta {
   pages: number;
 }
 
+/**
+ * Admin list filters.
+ *
+ * Location (state = Bundesland, city) and the four relevance signals are
+ * independent filters: a listing in Hessen and a listing relevant to Persian
+ * speakers are separate dimensions, and the UI never implies one from the other.
+ */
 export interface ServiceListFilters {
   q?: string;
   status?: ServiceStatus | "";
   city?: string;
+  state?: string;
   category_id?: string;
   owner_user_id?: string;
-  persian_owned?: string;
-  persian_language?: string;
-  persian_service?: string;
+  persian_owned?: RelevanceAnswerChoice | "";
+  persian_provider?: RelevanceAnswerChoice | "";
+  persian_language?: RelevanceAnswerChoice | "";
+  persian_service?: RelevanceAnswerChoice | "";
   source?: string;
 }
 

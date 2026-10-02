@@ -21,14 +21,20 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { fetchCategories, fetchServices } from "@/lib/serviceApi";
 import {
+  BUNDESLAENDER,
+  PERSIAN_FLAG_OPTIONS,
+  RELEVANCE_ANSWER_LABELS,
+  RELEVANCE_ANSWER_OPTIONS,
   STATUS_LABELS,
-  activePersianFlagCount,
   formatDateTime,
+  persianFlags,
   primaryCategoryName,
+  unassessedRelevanceCount,
 } from "@/lib/serviceDisplay";
 import {
   Category,
   PaginationMeta,
+  RelevanceAnswerChoice,
   Service,
   ServiceListFilters,
   ServiceStatus,
@@ -46,11 +52,6 @@ import {
 const PAGE_SIZE = 20;
 
 const emptyFilters: ServiceListFilters = {};
-
-const yesNo = [
-  { value: "true", label: "بله" },
-  { value: "false", label: "خیر" },
-];
 
 const ServiceManagement = () => {
   const navigate = useNavigate();
@@ -127,15 +128,25 @@ const ServiceManagement = () => {
   );
 
   const PersianBadges = ({ service }: { service: Service }) => {
-    const count = activePersianFlagCount(service);
-    if (count === 0) {
+    const active = persianFlags(service).filter((flag) => flag.active);
+    const unassessed = unassessedRelevanceCount(service);
+    if (active.length === 0 && unassessed === 0) {
       return <span className="text-xs text-silver">—</span>;
     }
     return (
-      <div className="flex flex-wrap gap-1">
-        {service.persian_owned && <Badge variant="outline">مالک ایرانی/فارسی</Badge>}
-        {service.persian_language && <Badge variant="outline">زبان فارسی</Badge>}
-        {service.persian_service && <Badge variant="outline">خدمت فارسی</Badge>}
+      <div className="flex flex-wrap items-center gap-1">
+        {active.map((flag) => (
+          <Badge key={flag.key} variant="outline">
+            {flag.short}
+          </Badge>
+        ))}
+        {/* "Unknown" is real information here: it tells the admin which records
+            still need assessing, so it is surfaced rather than hidden. */}
+        {unassessed > 0 && (
+          <Badge variant="secondary" className="text-[10px]">
+            {unassessed} نامشخص
+          </Badge>
+        )}
       </div>
     );
   };
@@ -193,11 +204,11 @@ const ServiceManagement = () => {
                       </Badge>
 
                       <DataBlock
-                        label="شهر"
+                        label="موقعیت"
                         value={
-                          <span className="inline-flex items-center gap-1">
+                          <span className="inline-flex items-center gap-1" dir="auto">
                             <MapPin className="h-3 w-3 text-silver" />
-                            {service.city || "—"}
+                            {[service.city, service.state].filter(Boolean).join("، ") || "—"}
                           </span>
                         }
                       />
@@ -309,6 +320,23 @@ const ServiceManagement = () => {
             </label>
 
             <label className="space-y-2">
+              <span className="text-sm font-medium text-silver">Bundesland</span>
+              <Input
+                dir="ltr"
+                list="bundeslaender-filter"
+                value={filters.state ?? ""}
+                onChange={(event) => setFilter("state", event.target.value)}
+                placeholder="مثلاً Hessen"
+                className="rounded-xl bg-secondary/50"
+              />
+            </label>
+            <datalist id="bundeslaender-filter">
+              {BUNDESLAENDER.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
+
+            <label className="space-y-2">
               <span className="text-sm font-medium text-silver">دسته‌بندی</span>
               <select
                 value={filters.category_id ?? ""}
@@ -347,25 +375,23 @@ const ServiceManagement = () => {
             </label>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {[
-              ["persian_owned", "مالک ایرانی/فارسی"],
-              ["persian_language", "ارائه با زبان فارسی"],
-              ["persian_service", "خدمت ایرانی/فارسی"],
-            ].map(([param, label]) => (
-              <label key={param} className="space-y-2">
-                <span className="text-sm font-medium text-silver">{label}</span>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {PERSIAN_FLAG_OPTIONS.map((option) => (
+              <label key={option.key} className="space-y-2">
+                <span className="text-sm font-medium text-silver">{option.short}</span>
                 <select
-                  value={(filters as Record<string, string | undefined>)[param] ?? ""}
+                  value={filters[option.key] ?? ""}
                   onChange={(event) =>
-                    setFilter(param as keyof ServiceListFilters, event.target.value)
+                    setFilter(option.key, event.target.value as RelevanceAnswerChoice | "")
                   }
                   className="h-10 w-full rounded-xl border border-silver-light/50 bg-secondary/50 px-3 text-charcoal"
                 >
                   <option value="">همه</option>
-                  {yesNo.map((choice) => (
-                    <option key={choice.value} value={choice.value}>
-                      {choice.label}
+                  {/* Tri-state: "نامشخص" selects the records nobody has
+                      assessed, which a plain yes/no filter cannot reach. */}
+                  {RELEVANCE_ANSWER_OPTIONS.map((choice) => (
+                    <option key={choice} value={choice}>
+                      {RELEVANCE_ANSWER_LABELS[choice]}
                     </option>
                   ))}
                 </select>

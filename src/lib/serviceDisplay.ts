@@ -1,6 +1,9 @@
 import {
   ContactType,
   OwnerCandidate,
+  RELEVANCE_KEYS,
+  RelevanceAnswerChoice,
+  RelevanceKey,
   Service,
   ServiceStatus,
 } from "@/types/service";
@@ -62,14 +65,21 @@ export function platformLabel(platform: string | null | undefined): string {
 }
 
 /**
- * The three Persian-relevance flags, as independent facts.
+ * The four Iranian/Persian relevance signals, as four independent facts.
  *
- * `persian_owned` is about OWNERSHIP, not about the owner being able to speak
- * Persian, so its label deliberately says "Iranian/Persian-owned" rather than
- * anything about language.
+ * The distinctions that matter, and that the wording must not blur:
+ *   ownership  - who owns the business
+ *   provider   - who actually performs the service
+ *   language   - what language the customer can be served in
+ *   service    - what the product itself is
+ *
+ * Ownership and provider are deliberately separate because they often differ
+ * (a German-owned clinic with an Iranian dentist), and none of them is about
+ * where the service is located: this directory is German, and these attributes
+ * say nothing about geography.
  */
 export const PERSIAN_FLAG_OPTIONS: Array<{
-  key: "persian_owned" | "persian_language" | "persian_service";
+  key: RelevanceKey;
   label: string;
   hint: string;
   short: string;
@@ -77,34 +87,56 @@ export const PERSIAN_FLAG_OPTIONS: Array<{
   {
     key: "persian_owned",
     label: "مالکیت ایرانی یا فارسی",
-    hint: "کسب‌وکار توسط ایرانی یا فارسی‌زبان اداره می‌شود. این درباره مالکیت است، نه درباره زبانی که مالک صحبت می‌کند.",
+    hint: "مالک کسب‌وکار ایرانی یا فارسی‌تبار است. این فقط دربارهٔ مالکیت است، نه دربارهٔ زبانی که مالک صحبت می‌کند و نه دربارهٔ کسی که کار را انجام می‌دهد.",
     short: "مالک ایرانی/فارسی",
+  },
+  {
+    key: "persian_provider",
+    label: "ارائه‌دهندهٔ ایرانی یا فارسی",
+    hint: "کسی که واقعاً خدمت را انجام می‌دهد ایرانی یا فارسی‌تبار است. برای نمونه یک کلینیک با مالکیت آلمانی و دندان‌پزشش ایرانی: مالکیت خیر، ارائه‌دهنده بله.",
+    short: "ارائه‌دهندهٔ ایرانی/فارسی",
   },
   {
     key: "persian_language",
     label: "ارائه خدمات به زبان فارسی",
-    hint: "مشتری می‌تواند با این سرویس به فارسی صحبت کند یا کار را پیش ببرد.",
+    hint: "مشتری می‌تواند این خدمت را به زبان فارسی دریافت کند. این هیچ چیزی دربارهٔ ملیت مالک یا ارائه‌دهنده نمی‌گوید.",
     short: "زبان فارسی",
   },
   {
     key: "persian_service",
-    label: "خدمت یا محصول مخصوص ایرانی و فارسی",
-    hint: "خودِ محصول ذاتاً ایرانی یا فارسی است؛ مثل غذای ایرانی، فرش ایرانی یا محصولات وارداتی ایران.",
+    label: "خدمت یا محصول ایرانی و فارسی",
+    hint: "خودِ محصول یا خدمت ذاتاً ایرانی یا فارسی است؛ مثل غذای ایرانی، فرش ایرانی یا خدمات فرهنگی ایرانی. لازم نیست مالک یا ارائه‌دهنده ایرانی باشد.",
     short: "خدمت ایرانی/فارسی",
   },
 ];
 
-export function persianFlags(service: Pick<Service, "persian_owned" | "persian_language" | "persian_service">) {
+/** Labels for the tri-state control. Admins never see nullable-boolean wording. */
+export const RELEVANCE_ANSWER_LABELS: Record<RelevanceAnswerChoice, string> = {
+  unknown: "نامشخص",
+  yes: "بله",
+  no: "خیر",
+};
+
+export const RELEVANCE_ANSWER_OPTIONS: RelevanceAnswerChoice[] = ["unknown", "yes", "no"];
+
+export function persianFlags(service: Pick<Service, RelevanceKey>) {
   return PERSIAN_FLAG_OPTIONS.map((option) => ({
     key: option.key,
     label: option.label,
     short: option.short,
-    active: service[option.key],
+    /** null means "not assessed", which is not the same as "no". */
+    answer: service[option.key],
+    active: service[option.key] === true,
   }));
 }
 
 export function activePersianFlagCount(service: Service): number {
-  return [service.persian_owned, service.persian_language, service.persian_service].filter(Boolean).length;
+  return RELEVANCE_KEYS.filter((key) => service[key] === true).length;
+}
+
+/** How many signals have not been assessed yet, for the list display. */
+export function unassessedRelevanceCount(service: Service): number {
+  return RELEVANCE_KEYS.filter((key) => service[key] === null).length;
 }
 
 export function primaryCategoryName(service: Service): string {
@@ -144,6 +176,39 @@ export function ownerIdLabel(ownerUserId: number | null): string {
   if (ownerUserId === null || ownerUserId === undefined) return "بدون مالک";
   return String(ownerUserId);
 }
+
+/* --------------------------------------------------------------- location */
+
+/** This directory covers services located in Germany. */
+export const DEFAULT_COUNTRY = "Germany";
+
+export const DEFAULT_COUNTRY_LABEL = "آلمان";
+
+/**
+ * The 16 German Bundeslaender, offered as suggestions in the editor.
+ *
+ * This is a convenience list for data entry, not a controlled reference system:
+ * `state` is stored as free text so the product is not locked to Germany
+ * forever, and an admin can always type a value that is not listed.
+ */
+export const BUNDESLAENDER = [
+  "Baden-Württemberg",
+  "Bayern",
+  "Berlin",
+  "Brandenburg",
+  "Bremen",
+  "Hamburg",
+  "Hessen",
+  "Mecklenburg-Vorpommern",
+  "Niedersachsen",
+  "Nordrhein-Westfalen",
+  "Rheinland-Pfalz",
+  "Saarland",
+  "Sachsen",
+  "Sachsen-Anhalt",
+  "Schleswig-Holstein",
+  "Thüringen",
+] as const;
 
 /**
  * Client-side mirror of the backend publish rule, used only to block an

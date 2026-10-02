@@ -27,9 +27,13 @@ import {
   searchOwnerCandidates,
 } from "@/lib/serviceApi";
 import {
+  BUNDESLAENDER,
   CONTACT_TYPE_HINTS,
   CONTACT_TYPE_LABELS,
+  DEFAULT_COUNTRY,
   PERSIAN_FLAG_OPTIONS,
+  RELEVANCE_ANSWER_LABELS,
+  RELEVANCE_ANSWER_OPTIONS,
   STATUS_HINTS,
   STATUS_LABELS,
   checkPublishRequirements,
@@ -41,10 +45,13 @@ import {
   ContactType,
   CONTACT_TYPES,
   OwnerCandidate,
+  RelevanceAnswerChoice,
   ServiceCategoryInput,
   ServiceContactInput,
   ServiceStatus,
   SERVICE_STATUSES,
+  relevanceAnswerToChoice,
+  relevanceChoiceToAnswer,
 } from "@/types/service";
 
 /**
@@ -112,13 +119,19 @@ const ServiceEditor = () => {
   const [address, setAddress] = useState("");
   const [postalCode, setPostalCode] = useState("");
   const [city, setCity] = useState("");
-  const [country, setCountry] = useState("");
+  /** Bundesland. Free text in the backend; the list below only suggests values. */
+  const [state, setState] = useState("");
+  // Germany is the normal default, so the admin does not retype it every time.
+  const [country, setCountry] = useState(DEFAULT_COUNTRY);
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
 
-  const [persianOwned, setPersianOwned] = useState(false);
-  const [persianLanguage, setPersianLanguage] = useState(false);
-  const [persianService, setPersianService] = useState(false);
+  // The four Iranian/Persian signals are independent and tri-state: an admin
+  // picks unknown / yes / no, which maps to null / true / false.
+  const [persianOwned, setPersianOwned] = useState<RelevanceAnswerChoice>("unknown");
+  const [persianProvider, setPersianProvider] = useState<RelevanceAnswerChoice>("unknown");
+  const [persianLanguage, setPersianLanguage] = useState<RelevanceAnswerChoice>("unknown");
+  const [persianService, setPersianService] = useState<RelevanceAnswerChoice>("unknown");
 
   const [status, setStatus] = useState<ServiceStatus>("draft");
 
@@ -175,12 +188,14 @@ const ServiceEditor = () => {
         setAddress(service.address ?? "");
         setPostalCode(service.postal_code ?? "");
         setCity(service.city ?? "");
+        setState(service.state ?? "");
         setCountry(service.country ?? "");
         setLatitude(service.latitude === null ? "" : String(service.latitude));
         setLongitude(service.longitude === null ? "" : String(service.longitude));
-        setPersianOwned(service.persian_owned);
-        setPersianLanguage(service.persian_language);
-        setPersianService(service.persian_service);
+        setPersianOwned(relevanceAnswerToChoice(service.persian_owned));
+        setPersianProvider(relevanceAnswerToChoice(service.persian_provider));
+        setPersianLanguage(relevanceAnswerToChoice(service.persian_language));
+        setPersianService(relevanceAnswerToChoice(service.persian_service));
         setStatus(service.status);
         setOwnerUserId(service.owner_user_id);
         setShowOwner(service.show_owner);
@@ -375,12 +390,15 @@ const ServiceEditor = () => {
         address: address.trim() || null,
         postal_code: postalCode.trim() || null,
         city: city.trim() || null,
+        state: state.trim() || null,
         country: country.trim() || null,
         latitude: latitude === "" ? null : Number(latitude),
         longitude: longitude === "" ? null : Number(longitude),
-        persian_owned: persianOwned,
-        persian_language: persianLanguage,
-        persian_service: persianService,
+        // "unknown" is sent as null, never as false.
+        persian_owned: relevanceChoiceToAnswer(persianOwned),
+        persian_provider: relevanceChoiceToAnswer(persianProvider),
+        persian_language: relevanceChoiceToAnswer(persianLanguage),
+        persian_service: relevanceChoiceToAnswer(persianService),
         status,
         source: source.trim() || null,
         external_id: externalId.trim() || null,
@@ -398,12 +416,15 @@ const ServiceEditor = () => {
       }
 
       /* One request for the whole aggregate: scalars, owner, show_owner,
-         contacts and categories commit together or not at all. */
-      const saved = await saveServiceAggregate(
-        numericId as number,
-        aggregate,
-        loadedUpdatedAt,
-      );
+         contacts and categories commit together or not at all. The loaded
+         updated_at is mandatory and lets the backend refuse a stale save. */
+      if (!loadedUpdatedAt) {
+        throw new Error("this service could not be loaded, so a safe save is not possible");
+      }
+      const saved = await saveServiceAggregate(numericId as number, {
+        ...aggregate,
+        expected_updated_at: loadedUpdatedAt,
+      });
       setLoadedUpdatedAt(saved.updated_at);
       setIsStale(false);
       toast({ title: "سرویس به‌روزرسانی شد" });
@@ -487,7 +508,10 @@ const ServiceEditor = () => {
         </Section>
 
         {/* ---------------------------------------------------- location */}
-        <Section title="موقعیت" description="نشانی ساختاریافته است و در جست‌وجو استفاده می‌شود.">
+        <Section
+          title="موقعیت"
+          description="این سرویس در آلمان واقع شده است. نشانی ساختاریافته است و در جست‌وجو استفاده می‌شود."
+        >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <FieldLabel>
               نشانی
@@ -511,12 +535,25 @@ const ServiceEditor = () => {
               <Input
                 value={city}
                 onChange={(event) => setCity(event.target.value)}
+                placeholder="مثلاً فرانکفورت"
                 className="mt-1 rounded-xl bg-secondary/50"
               />
             </FieldLabel>
-            <FieldLabel>
+            <FieldLabel hint="ایالت آلمان. اگر در فهرست نبود می‌توانید دستی بنویسید.">
+              Bundesland
+              <Input
+                dir="ltr"
+                list="bundeslaender"
+                value={state}
+                onChange={(event) => setState(event.target.value)}
+                placeholder="مثلاً Hessen"
+                className="mt-1 rounded-xl bg-secondary/50"
+              />
+            </FieldLabel>
+            <FieldLabel hint="پیش‌فرض این سامانه آلمان است.">
               کشور
               <Input
+                dir="ltr"
                 value={country}
                 onChange={(event) => setCountry(event.target.value)}
                 className="mt-1 rounded-xl bg-secondary/50"
@@ -543,31 +580,61 @@ const ServiceEditor = () => {
               />
             </FieldLabel>
           </div>
+          <datalist id="bundeslaender">
+            {BUNDESLAENDER.map((name) => (
+              <option key={name} value={name} />
+            ))}
+          </datalist>
         </Section>
 
-        {/* ------------------------------------------- persian relevance */}
+        {/* ------------------------------------- iranian / persian relevance */}
         <Section
-          title="نشانه‌های فارسی"
-          description="این سه مورد مستقل هستند و هر ترکیبی مجاز است. مالکیت دربارهٔ ایرانی یا فارسی بودنِ مالک است، نه دربارهٔ زبانی که او صحبت می‌کند."
+          title="نشانه‌های ایرانی و فارسی"
+          description="این چهار مورد مستقل هستند و هر ترکیبی مجاز است. هیچ‌کدام ربطی به محل سرویس ندارد؛ سرویس در آلمان است و این‌ها ویژگی مالک، ارائه‌دهنده، زبان یا نوع خدمت هستند. اگر چیزی را نمی‌دانید «نامشخص» را انتخاب کنید تا با «خیر» اشتباه نشود."
         >
           {PERSIAN_FLAG_OPTIONS.map((option) => {
             const item =
               option.key === "persian_owned"
                 ? { label: option.label, hint: option.hint, value: persianOwned, setter: setPersianOwned }
-                : option.key === "persian_language"
-                  ? { label: option.label, hint: option.hint, value: persianLanguage, setter: setPersianLanguage }
-                  : { label: option.label, hint: option.hint, value: persianService, setter: setPersianService };
+                : option.key === "persian_provider"
+                  ? { label: option.label, hint: option.hint, value: persianProvider, setter: setPersianProvider }
+                  : option.key === "persian_language"
+                    ? { label: option.label, hint: option.hint, value: persianLanguage, setter: setPersianLanguage }
+                    : { label: option.label, hint: option.hint, value: persianService, setter: setPersianService };
             return (
-            <div
-              key={item.label}
-              className="flex items-start justify-between gap-4 rounded-xl border bg-secondary/30 p-3"
-            >
-              <div>
-                <p className="text-sm font-medium text-charcoal">{item.label}</p>
-                <p className="mt-1 text-xs text-silver">{item.hint}</p>
+              <div
+                key={option.key}
+                className="flex flex-col gap-3 rounded-xl border bg-secondary/30 p-3 sm:flex-row sm:items-start sm:justify-between"
+              >
+                <div>
+                  <p className="text-sm font-medium text-charcoal">{option.label}</p>
+                  <p className="mt-1 text-xs text-silver">{option.hint}</p>
+                </div>
+                {/* Three explicit states. A two-way switch could not express
+                    "not assessed", which is the whole point of the field. */}
+                <div
+                  role="radiogroup"
+                  aria-label={option.label}
+                  className="flex shrink-0 gap-1 rounded-full bg-secondary/60 p-1"
+                >
+                  {RELEVANCE_ANSWER_OPTIONS.map((choice) => (
+                    <button
+                      key={choice}
+                      type="button"
+                      role="radio"
+                      aria-checked={item.value === choice}
+                      onClick={() => item.setter(choice)}
+                      className={`rounded-full px-3 py-1 text-xs transition ${
+                        item.value === choice
+                          ? "bg-white font-bold text-charcoal shadow-sm"
+                          : "text-silver hover:text-charcoal"
+                      }`}
+                    >
+                      {RELEVANCE_ANSWER_LABELS[choice]}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <Switch checked={item.value} onCheckedChange={item.setter} />
-            </div>
             );
           })}
         </Section>
