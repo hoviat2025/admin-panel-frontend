@@ -20,18 +20,16 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import {
-  assignServiceOwner,
   createService,
   fetchCategories,
   fetchService,
-  replaceServiceCategories,
-  replaceServiceContacts,
+  saveServiceAggregate,
   searchOwnerCandidates,
-  updateService,
 } from "@/lib/serviceApi";
 import {
   CONTACT_TYPE_HINTS,
   CONTACT_TYPE_LABELS,
+  PERSIAN_FLAG_OPTIONS,
   STATUS_HINTS,
   STATUS_LABELS,
   checkPublishRequirements,
@@ -137,6 +135,10 @@ const ServiceEditor = () => {
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
   const [primaryCategoryId, setPrimaryCategoryId] = useState<number | null>(null);
 
+  /** The service's updated_at as loaded, used for optimistic concurrency. */
+  const [loadedUpdatedAt, setLoadedUpdatedAt] = useState<string | null>(null);
+  const [isStale, setIsStale] = useState(false);
+
   const [contacts, setContacts] = useState<ContactRow[]>([]);
 
   /* ------------------------------------------------------------------ load */
@@ -166,6 +168,8 @@ const ServiceEditor = () => {
       try {
         const service = await fetchService(numericId as number);
         if (cancelled) return;
+        setLoadedUpdatedAt(service.updated_at);
+        setIsStale(false);
         setName(service.name ?? "");
         setDescription(service.description ?? "");
         setAddress(service.address ?? "");
@@ -365,7 +369,7 @@ const ServiceEditor = () => {
 
     setIsSaving(true);
     try {
-      const scalars = {
+      const aggregate = {
         name: name.trim(),
         description: description.trim() || null,
         address: address.trim() || null,
@@ -381,37 +385,40 @@ const ServiceEditor = () => {
         source: source.trim() || null,
         external_id: externalId.trim() || null,
         show_owner: showOwner,
+        owner_user_id: ownerUserId,
+        contacts: buildContactPayload(),
+        categories: buildCategoryPayload(),
       };
 
       if (isNew) {
-        const created = await createService({
-          ...scalars,
-          owner_user_id: ownerUserId,
-          contacts: buildContactPayload(),
-          categories: buildCategoryPayload(),
-        });
+        const created = await createService(aggregate);
         toast({ title: "سرویس ایجاد شد", description: created.name });
         navigate(`/services/${created.id}`);
         return;
       }
 
-      const id = numericId as number;
-      /* Contacts and categories first: publishing is validated against the
-         stored categories, so they must be in place before the status changes. */
-      await replaceServiceContacts(id, buildContactPayload());
-      await replaceServiceCategories(id, buildCategoryPayload());
-      await updateService(id, scalars);
-      /* Owner has its own endpoint. */
-      await assignServiceOwner(id, ownerUserId);
-      await updateService(id, { show_owner: showOwner });
-
+      /* One request for the whole aggregate: scalars, owner, show_owner,
+         contacts and categories commit together or not at all. */
+      const saved = await saveServiceAggregate(
+        numericId as number,
+        aggregate,
+        loadedUpdatedAt,
+      );
+      setLoadedUpdatedAt(saved.updated_at);
+      setIsStale(false);
       toast({ title: "سرویس به‌روزرسانی شد" });
       navigate("/services");
     } catch (error) {
+      const message = error instanceof Error ? error.message : "ذخیره سرویس ناموفق بود.";
+      /* 409 means another admin saved this service since it was loaded. The
+         data on screen is stale, so offer a reload rather than retrying. */
+      if (/changed by someone else/i.test(message)) {
+        setIsStale(true);
+      }
       toast({
         variant: "destructive",
-        title: "ذخیره نشد",
-        description: error instanceof Error ? error.message : "ذخیره سرویس ناموفق بود.",
+        title: /changed by someone else/i.test(message) ? "تغییر همزمان" : "ذخیره نشد",
+        description: message,
       });
     } finally {
       setIsSaving(false);
@@ -436,6 +443,25 @@ const ServiceEditor = () => {
         <h2 className="text-xl font-bold text-charcoal">
           {isNew ? "سرویس جدید" : `ویرایش سرویس #${numericId}`}
         </h2>
+
+        {/* Shown when the save was refused because someone else changed this
+            service after it was loaded. Retrying would overwrite their work. */}
+        {isStale && (
+          <div className="flex items-start justify-between gap-3 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm">
+            <div>
+              <p className="font-bold text-charcoal">
+                این سرویس در فاصلهٔ باز کردن صفحه توسط شخص دیگری تغییر کرده است.
+              </p>
+              <p className="text-silver">
+                برای اینکه تغییرات آن شخص بازنویسی نشود، صفحه را دوباره بارگذاری کنید و
+                سپس تغییرات خود را دوباره اعمال کنید.
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+              بارگذاری دوباره
+            </Button>
+          </div>
+        )}
 
         {/* ------------------------------------------------------- basic */}
         <Section title="اطلاعات پایه">
@@ -522,28 +548,16 @@ const ServiceEditor = () => {
         {/* ------------------------------------------- persian relevance */}
         <Section
           title="نشانه‌های فارسی"
-          description="این سه مورد مستقل هستند و هر ترکیبی مجاز است."
+          description="این سه مورد مستقل هستند و هر ترکیبی مجاز است. مالکیت دربارهٔ ایرانی یا فارسی بودنِ مالک است، نه دربارهٔ زبانی که او صحبت می‌کند."
         >
-          {[
-            {
-              label: "مالک فارسی‌زبان",
-              hint: "این کسب‌وکار توسط ایرانی یا فارسی‌زبان اداره می‌شود.",
-              value: persianOwned,
-              setter: setPersianOwned,
-            },
-            {
-              label: "ارائه با زبان فارسی",
-              hint: "می‌توان با این سرویس به فارسی صحبت کرد یا کار کرد.",
-              value: persianLanguage,
-              setter: setPersianLanguage,
-            },
-            {
-              label: "خدمت فارسی‌محور",
-              hint: "خودِ محصول یا خدمت ذاتاً فارسی/ایرانی است، مثل غذای ایرانی یا فرش ایرانی.",
-              value: persianService,
-              setter: setPersianService,
-            },
-          ].map((item) => (
+          {PERSIAN_FLAG_OPTIONS.map((option) => {
+            const item =
+              option.key === "persian_owned"
+                ? { label: option.label, hint: option.hint, value: persianOwned, setter: setPersianOwned }
+                : option.key === "persian_language"
+                  ? { label: option.label, hint: option.hint, value: persianLanguage, setter: setPersianLanguage }
+                  : { label: option.label, hint: option.hint, value: persianService, setter: setPersianService };
+            return (
             <div
               key={item.label}
               className="flex items-start justify-between gap-4 rounded-xl border bg-secondary/30 p-3"
@@ -554,7 +568,8 @@ const ServiceEditor = () => {
               </div>
               <Switch checked={item.value} onCheckedChange={item.setter} />
             </div>
-          ))}
+            );
+          })}
         </Section>
 
         {/* --------------------------------------------------- categories */}
@@ -571,30 +586,41 @@ const ServiceEditor = () => {
               {orderedCategories.map(({ category, depth }) => {
                 const selected = selectedCategoryIds.includes(category.id);
                 const isPrimary = primaryCategoryId === category.id;
+                const retired = !category.is_active;
+                /* A retired category cannot be newly assigned, but an existing
+                   assignment stays visible and removable. */
+                const cannotAssign = retired && !selected;
+                const cannotBePrimary = retired && !isPrimary;
                 return (
                   <div
                     key={category.id}
-                    className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-secondary/40"
+                    className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 ${
+                      retired ? "opacity-60" : "hover:bg-secondary/40"
+                    }`}
                     style={{ paddingInlineStart: `${depth * 16 + 8}px` }}
                   >
                     <label className="flex flex-1 items-center gap-2 text-sm">
                       <input
                         type="checkbox"
                         checked={selected}
+                        disabled={cannotAssign}
                         onChange={() => toggleCategory(category.id)}
                         className="h-4 w-4"
                       />
                       <span className={selected ? "text-charcoal" : "text-silver"}>
                         {category.name}
                       </span>
-                      {!category.is_active && (
-                        <span className="text-[10px] text-silver">(غیرفعال)</span>
+                      {retired && (
+                        <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] text-silver">
+                          {selected ? "غیرفعال (نگه داشته شده)" : "غیرفعال"}
+                        </span>
                       )}
                     </label>
                     <button
                       type="button"
                       onClick={() => choosePrimary(category.id)}
-                      className={`rounded-full px-2 py-0.5 text-[11px] ${
+                      disabled={cannotBePrimary}
+                      className={`rounded-full px-2 py-0.5 text-[11px] disabled:cursor-not-allowed disabled:opacity-40 ${
                         isPrimary
                           ? "bg-secondary font-bold text-charcoal"
                           : "text-silver hover:bg-secondary/50"

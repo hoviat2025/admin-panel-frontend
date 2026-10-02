@@ -7,7 +7,7 @@ import {
   OwnerCandidate,
   PaginationMeta,
   Service,
-  ServiceCategoriesReplaceRequest,
+  ServiceAggregateSavePayload,
   ServiceCategoryInput,
   ServiceContactInput,
   ServiceCreatePayload,
@@ -113,6 +113,26 @@ export async function createService(payload: ServiceCreatePayload): Promise<Serv
 
 export async function updateService(id: number, payload: ServiceUpdatePayload): Promise<Service> {
   const body = await request<Service>(`/services/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+  return body.data;
+}
+
+/**
+ * Save the whole editable aggregate of an existing service in one request.
+ *
+ * This is what the editor uses for an existing service: one transaction, so a
+ * failure cannot leave new contacts with old categories. `expectedUpdatedAt` is
+ * the `updated_at` the editor loaded; if another admin saved in the meantime
+ * the backend answers 409 instead of overwriting their work.
+ */
+export async function saveServiceAggregate(
+  id: number,
+  payload: ServiceAggregateSavePayload,
+  expectedUpdatedAt?: string | null,
+): Promise<Service> {
+  const body = await request<Service>(`/services/${id}`, {
+    method: "PUT",
+    body: JSON.stringify({ ...payload, expected_updated_at: expectedUpdatedAt ?? null }),
+  });
   return body.data;
 }
 

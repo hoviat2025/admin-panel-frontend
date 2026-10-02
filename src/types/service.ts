@@ -139,6 +139,14 @@ export interface ServiceUpdatePayload {
   external_id?: string | null;
 }
 
+/**
+ * Full editable state of an existing service, saved in one request/transaction.
+ * Same as create, plus the optimistic-concurrency token.
+ */
+export interface ServiceAggregateSavePayload extends ServiceCreatePayload {
+  expected_updated_at?: string | null;
+}
+
 export interface CategoryCreatePayload {
   name: string;
   slug: string;

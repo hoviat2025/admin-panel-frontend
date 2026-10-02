@@ -133,7 +133,7 @@ const ServiceManagement = () => {
     }
     return (
       <div className="flex flex-wrap gap-1">
-        {service.persian_owned && <Badge variant="outline">مالک فارسی</Badge>}
+        {service.persian_owned && <Badge variant="outline">مالک ایرانی/فارسی</Badge>}
         {service.persian_language && <Badge variant="outline">زبان فارسی</Badge>}
         {service.persian_service && <Badge variant="outline">خدمت فارسی</Badge>}
       </div>
@@ -349,9 +349,9 @@ const ServiceManagement = () => {
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {[
-              ["persian_owned", "مالک فارسی‌زبان"],
+              ["persian_owned", "مالک ایرانی/فارسی"],
               ["persian_language", "ارائه با زبان فارسی"],
-              ["persian_service", "خدمت فارسی‌محور"],
+              ["persian_service", "خدمت ایرانی/فارسی"],
             ].map(([param, label]) => (
               <label key={param} className="space-y-2">
                 <span className="text-sm font-medium text-silver">{label}</span>

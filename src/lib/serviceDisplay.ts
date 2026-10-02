@@ -61,12 +61,46 @@ export function platformLabel(platform: string | null | undefined): string {
   return PLATFORM_LABELS[platform.toLowerCase()] ?? platform;
 }
 
+/**
+ * The three Persian-relevance flags, as independent facts.
+ *
+ * `persian_owned` is about OWNERSHIP, not about the owner being able to speak
+ * Persian, so its label deliberately says "Iranian/Persian-owned" rather than
+ * anything about language.
+ */
+export const PERSIAN_FLAG_OPTIONS: Array<{
+  key: "persian_owned" | "persian_language" | "persian_service";
+  label: string;
+  hint: string;
+  short: string;
+}> = [
+  {
+    key: "persian_owned",
+    label: "مالکیت ایرانی یا فارسی",
+    hint: "کسب‌وکار توسط ایرانی یا فارسی‌زبان اداره می‌شود. این درباره مالکیت است، نه درباره زبانی که مالک صحبت می‌کند.",
+    short: "مالک ایرانی/فارسی",
+  },
+  {
+    key: "persian_language",
+    label: "ارائه خدمات به زبان فارسی",
+    hint: "مشتری می‌تواند با این سرویس به فارسی صحبت کند یا کار را پیش ببرد.",
+    short: "زبان فارسی",
+  },
+  {
+    key: "persian_service",
+    label: "خدمت یا محصول مخصوص ایرانی و فارسی",
+    hint: "خودِ محصول ذاتاً ایرانی یا فارسی است؛ مثل غذای ایرانی، فرش ایرانی یا محصولات وارداتی ایران.",
+    short: "خدمت ایرانی/فارسی",
+  },
+];
+
 export function persianFlags(service: Pick<Service, "persian_owned" | "persian_language" | "persian_service">) {
-  return [
-    { key: "persian_owned" as const, label: "مالک فارسی‌زبان", active: service.persian_owned },
-    { key: "persian_language" as const, label: "ارائه با زبان فارسی", active: service.persian_language },
-    { key: "persian_service" as const, label: "خدمت فارسی‌محور", active: service.persian_service },
-  ];
+  return PERSIAN_FLAG_OPTIONS.map((option) => ({
+    key: option.key,
+    label: option.label,
+    short: option.short,
+    active: service[option.key],
+  }));
 }
 
 export function activePersianFlagCount(service: Service): number {
