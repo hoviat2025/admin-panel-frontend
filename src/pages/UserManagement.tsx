@@ -51,7 +51,7 @@ const textFields = [
   ["username", "نام کاربری تلگرام"], ["first_name", "نام"], ["last_name", "نام خانوادگی"],
   ["nickname", "نام مستعار"], ["country", "کشور"], ["phone_number", "شماره تلفن"],
   ["whatsapp_number", "شماره واتساپ"], ["profile_path", "مسیر تصویر پروفایل"],
-  ["accounting_code", "کد حسابداری"], ["password", "رمز عبور"], ["mode", "حالت"],
+  ["accounting_code", "کد حسابداری"], ["mode", "حالت"],
   ["hilfen_status", "وضعیت هیلفن"], ["hilfen_command", "دستور هیلفن"],
   ["hilfen_data", "اطلاعات هیلفن"], ["hilfen_id_card_photo", "تصویر کارت شناسایی هیلفن"],
 ] as const;
@@ -112,7 +112,7 @@ const ADVANCED_FILTER_OPTIONS: AdvancedFilterOption[] = [
     ["no_counter", "شماره کاربر یوروبات"], ["no_accounting_code", "کد حسابداری"],
     ["no_username", "نام کاربری تلگرام"], ["no_first_name", "نام"], ["no_last_name", "نام خانوادگی"],
     ["no_nickname", "نام مستعار"], ["no_phone_number", "شماره تلفن"], ["no_whatsapp_number", "شماره واتساپ"],
-    ["no_country", "کشور"], ["no_password", "رمز عبور"], ["no_mode", "حالت"],
+    ["no_country", "کشور"], ["no_mode", "حالت"],
     ["no_join_date", "تاریخ عضویت"], ["no_profile_path", "تصویر پروفایل"],
     ["no_telegram_msg_id", "شناسه پیام تلگرام"], ["no_group_msg_id", "شناسه پیام گروه"],
     ["no_public_msg_id", "شناسه پیام عمومی"], ["no_public_group_msg_id", "شناسه پیام گروه عمومی"],

@@ -10,7 +10,6 @@ export interface User {
   last_name: string | null;
   mode: string | null;
   nickname: string | null;
-  password: string | null;
   phone_number: string | null;
   score: number;
   user_id: number;
