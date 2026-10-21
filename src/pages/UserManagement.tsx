@@ -23,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { User, getProfileImageUrl } from "@/types/user";
-import { dateTimeLocalToUnixSeconds, formatDateTime, formatUnixDateTime, getMembershipKind } from "@/lib/userDisplay";
+import { dateTimeLocalToUnixSeconds, formatDateTime, formatUnixDateTime, getMembershipKind, getUserDisplayName } from "@/lib/userDisplay";
 
 type ViewMode = "card" | "list";
 type FilterValues = Record<string, string>;
@@ -48,8 +48,8 @@ const emptyChoices = [
 ];
 
 const textFields = [
-  ["username", "نام کاربری تلگرام"], ["first_name", "نام"], ["last_name", "نام خانوادگی"],
-  ["nickname", "نام مستعار"], ["country", "کشور"], ["phone_number", "شماره تلفن"],
+  ["username", "نام کاربری تلگرام"], ["first_name", "نام (قدیمی)"], ["last_name", "نام خانوادگی (قدیمی)"],
+  ["nickname", "نام عمومی"], ["country", "کشور"], ["phone_number", "شماره تلفن"],
   ["whatsapp_number", "شماره واتساپ"], ["profile_path", "مسیر تصویر پروفایل"],
   ["accounting_code", "کد حسابداری"], ["mode", "حالت"],
   ["hilfen_status", "وضعیت هیلفن"], ["hilfen_command", "دستور هیلفن"],
@@ -110,8 +110,8 @@ const ADVANCED_FILTER_OPTIONS: AdvancedFilterOption[] = [
   { param: "is_in_hilfen_bot", label: "عضو هیلفن است", choices: yesNoChoices },
   ...[
     ["no_counter", "شماره کاربر یوروبات"], ["no_accounting_code", "کد حسابداری"],
-    ["no_username", "نام کاربری تلگرام"], ["no_first_name", "نام"], ["no_last_name", "نام خانوادگی"],
-    ["no_nickname", "نام مستعار"], ["no_phone_number", "شماره تلفن"], ["no_whatsapp_number", "شماره واتساپ"],
+    ["no_username", "نام کاربری تلگرام"], ["no_first_name", "نام (قدیمی)"], ["no_last_name", "نام خانوادگی (قدیمی)"],
+    ["no_nickname", "نام عمومی"], ["no_phone_number", "شماره تلفن"], ["no_whatsapp_number", "شماره واتساپ"],
     ["no_country", "کشور"], ["no_mode", "حالت"],
     ["no_join_date", "تاریخ عضویت"], ["no_profile_path", "تصویر پروفایل"],
     ["no_telegram_msg_id", "شناسه پیام تلگرام"], ["no_group_msg_id", "شناسه پیام گروه"],
@@ -360,14 +360,14 @@ const UserManagement = () => {
                       )}
                       <img
                         src={getProfileImageUrl(user.profile_path)}
-                        alt={user.first_name || "User"}
+                        alt={getUserDisplayName(user)}
                         className="w-16 h-16 rounded-full object-cover mb-3 border-2 border-silver-light"
                         onError={(e) => {
-                          e.currentTarget.src = `https://ui-avatars.com/api/?name=${user.first_name || 'U'}+${user.last_name || 'N'}&background=e5e5e5&color=333`;
+                          e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(getUserDisplayName(user))}&background=e5e5e5&color=333`;
                         }}
                       />
                       <h3 className="font-bold text-charcoal text-sm truncate w-full">
-                        {user.first_name} {user.last_name}
+                        {getUserDisplayName(user)}
                       </h3>
                       <p className="text-xs text-charcoal mt-1 font-mono" dir="ltr">
                         {user.user_id}
@@ -398,16 +398,16 @@ const UserManagement = () => {
                           
                           <img
                             src={getProfileImageUrl(user.profile_path)}
-                            alt={user.first_name || "User"}
+                            alt={getUserDisplayName(user)}
                             className="w-10 h-10 rounded-lg object-cover border border-silver-light flex-shrink-0"
                             onError={(e) => {
-                              e.currentTarget.src = `https://ui-avatars.com/api/?name=${user.first_name}+${user.last_name}&background=e5e5e5&color=333`;
+                              e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(getUserDisplayName(user))}&background=e5e5e5&color=333`;
                             }}
                           />
 
                           <DataBlock 
-                            label="نام" 
-                            value={`${user.first_name || ''} ${user.last_name || ''}`} 
+                            label="نام عمومی" 
+                            value={getUserDisplayName(user)} 
                           />
                           <MembershipBadges user={user} />
                           <DataBlock label="شناسه" value={user.user_id} dir="ltr" />

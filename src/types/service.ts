@@ -1,7 +1,7 @@
 /**
  * Service-directory types.
  *
- * These mirror the backend's Milestone 2A admin API exactly. The backend is
+ * These mirror the backend's admin API. The backend is
  * authoritative for every rule here (one primary category, provenance pairing,
  * status/publish requirements); the frontend only mirrors them to help the admin
  * and to catch obviously invalid states before a request is sent.
@@ -78,9 +78,10 @@ export interface Service {
 
   name: string;
   description: string | null;
+  cover_image_url: string | null;
 
   // Tri-state Iranian/Persian relevance. null = not assessed. These describe the
-  // listing and the people connected to it, NOT its location, which is Germany.
+  // listing and the people connected to it, independently of its location.
   persian_owned: RelevanceAnswer;
   persian_provider: RelevanceAnswer;
   persian_language: RelevanceAnswer;
@@ -91,7 +92,7 @@ export interface Service {
   city: string | null;
   /** First-level administrative area; in the German scope, the Bundesland. */
   state: string | null;
-  country: string | null;
+  country_code: string | null;
   latitude: number | null;
   longitude: number | null;
 
@@ -109,6 +110,9 @@ export interface Service {
 
 export interface Category {
   id: number;
+  level: 1 | 2;
+  parent_ids: number[];
+  /** Compatibility primary parent; parent_ids contains every placement. */
   parent_id: number | null;
   name: string;
   slug: string;
@@ -153,8 +157,8 @@ export interface ServiceCreatePayload {
   postal_code?: string | null;
   city?: string | null;
   state?: string | null;
-  /** Defaults to Germany in the admin UI; still overridable. */
-  country?: string | null;
+  /** ISO-3166-1 alpha-2 code; defaults to DE in the admin UI. */
+  country_code?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   status: ServiceStatus;
@@ -184,7 +188,7 @@ export interface ServiceUpdatePayload {
   postal_code?: string | null;
   city?: string | null;
   state?: string | null;
-  country?: string | null;
+  country_code?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   status?: ServiceStatus;
@@ -206,6 +210,8 @@ export interface CategoryCreatePayload {
   name: string;
   slug: string;
   parent_id?: number | null;
+  level?: 1 | 2;
+  parent_ids?: number[];
   description?: string | null;
   display_order: number;
   is_active: boolean;
@@ -215,6 +221,8 @@ export interface CategoryUpdatePayload {
   name?: string;
   slug?: string;
   parent_id?: number | null;
+  level?: 1 | 2;
+  parent_ids?: number[];
   description?: string | null;
   display_order?: number;
   is_active?: boolean;
@@ -238,6 +246,7 @@ export interface ServiceListFilters {
   q?: string;
   status?: ServiceStatus | "";
   city?: string;
+  country_code?: string;
   state?: string;
   category_id?: string;
   owner_user_id?: string;

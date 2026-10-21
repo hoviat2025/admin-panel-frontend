@@ -1,5 +1,12 @@
 import { User } from "@/types/user";
 
+/** The public profile name is nickname; older names remain admin fallbacks. */
+export function getUserDisplayName(user: Pick<User, "nickname" | "first_name" | "last_name" | "username" | "user_id">): string {
+  return user.nickname?.trim()
+    || [user.first_name, user.last_name].filter(Boolean).join(" ").trim()
+    || (user.username ? `@${user.username}` : `کاربر ${user.user_id}`);
+}
+
 export type MembershipKind = "both" | "eurobot" | "hilfen" | "neither";
 
 export function getMembershipKind(user: Pick<User, "is_in_eurobot" | "is_in_hilfen_bot">): MembershipKind {

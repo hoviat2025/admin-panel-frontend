@@ -28,6 +28,22 @@ import {
 
 const BASE = `${API_BASE_URL}/admin/service-management`;
 
+export interface LocationCity { id: number; city: string; count: number }
+export interface LocationState { id: number; state: string; total: number; cities: LocationCity[] }
+export interface LocationCountry { country_code: string; total: number; states: LocationState[] }
+export interface LocationCityRecord { id: number; state_id: number; name: string; aliases: string[] }
+
+/** Canonical shared places; includes cities that do not have a listing yet. */
+export async function fetchLocationCatalogue(): Promise<LocationCountry[]> {
+  const response = await fetch(`${API_BASE_URL}/services/services/location-catalogue/`);
+  return (await unwrap<LocationCountry[]>(response)).data ?? [];
+}
+
+/** Admin additions become shared choices rather than arbitrary listing text. */
+export async function createLocationCity(stateId: number, name: string): Promise<LocationCityRecord> {
+  return (await request<LocationCityRecord>("/locations/cities", { method: "POST", body: JSON.stringify({ state_id: stateId, name }) })).data;
+}
+
 export interface Envelope<T> {
   data: T;
   meta?: Partial<PaginationMeta>;
@@ -38,6 +54,10 @@ const authHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem("auth_token") ?? ""}`,
   "Content-Type": "application/json",
 });
+
+export class ServiceApiError extends Error {
+  constructor(message: string, public status: number, public code?: string) { super(message); }
+}
 
 /** Throws with the backend's message so callers can surface it verbatim. */
 async function unwrap<T>(response: Response): Promise<Envelope<T>> {
@@ -50,13 +70,13 @@ async function unwrap<T>(response: Response): Promise<Envelope<T>> {
 
   if (!response.ok) {
     if (response.status === 401) {
-      throw new Error("نشست شما منقضی شده است. دوباره وارد شوید.");
+      throw new ServiceApiError("نشست شما منقضی شده است. دوباره وارد شوید.", 401);
     }
     if (response.status === 403) {
-      throw new Error("شما اجازه انجام این عملیات را ندارید.");
+      throw new ServiceApiError("شما اجازه انجام این عملیات را ندارید.", 403);
     }
     const message = body?.error && typeof body.error === "object" ? body.error.message : undefined;
-    throw new Error(message || `درخواست با خطا مواجه شد (${response.status}).`);
+    throw new ServiceApiError(message || `درخواست با خطا مواجه شد (${response.status}).`, response.status, body?.error?.code);
   }
 
   return body ?? ({ data: null as T, meta: {}, error: {} });
@@ -137,6 +157,22 @@ export async function saveServiceAggregate(
   return body.data;
 }
 
+/** Browser sets the multipart boundary; the optimistic token protects the listing. */
+export async function uploadServiceCoverImage(id: number, file: File, expectedUpdatedAt: string): Promise<Service> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("expected_updated_at", expectedUpdatedAt);
+  const headers = new Headers(authHeaders());
+  headers.delete("Content-Type");
+  const response = await fetch(`${BASE}/services/${id}/cover-image`, { method: "POST", headers, body: form });
+  return (await unwrap<Service>(response)).data;
+}
+
+export async function removeServiceCoverImage(id: number, expectedUpdatedAt: string): Promise<Service> {
+  const params = new URLSearchParams({ expected_updated_at: expectedUpdatedAt });
+  return (await request<Service>(`/services/${id}/cover-image?${params}`, { method: "DELETE" })).data;
+}
+
 export async function changeServiceStatus(id: number, status: ServiceStatus): Promise<Service> {
   const body = await request<Service>(`/services/${id}/status`, {
     method: "PATCH",
@@ -187,11 +223,13 @@ export async function replaceServiceCategories(
 
 /* -------------------------------------------------------------- categories */
 
+/** Flat list has one row per category; parent_ids contains every main-group placement. */
 export async function fetchCategories(includeInactive = true): Promise<Category[]> {
   const body = await request<Category[]>(`/categories/?include_inactive=${includeInactive}`);
   return body.data ?? [];
 }
 
+/** Two levels; a shared subcategory can occur under multiple main groups. */
 export async function fetchCategoryTree(includeInactive = true): Promise<CategoryTreeNode[]> {
   const body = await request<CategoryTreeNode[]>(`/categories/tree?include_inactive=${includeInactive}`);
   return body.data ?? [];

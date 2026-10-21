@@ -75,7 +75,7 @@ export function platformLabel(platform: string | null | undefined): string {
  *
  * Ownership and provider are deliberately separate because they often differ
  * (a German-owned clinic with an Iranian dentist), and none of them is about
- * where the service is located: this directory is German, and these attributes
+ * where the service is located: the directory starts with Germany, and these attributes
  * say nothing about geography.
  */
 export const PERSIAN_FLAG_OPTIONS: Array<{
@@ -165,9 +165,9 @@ export function formatDateTime(value: string | null | undefined): string {
 
 export function ownerLabel(candidate: OwnerCandidate | null | undefined): string {
   if (!candidate) return "—";
+  if (candidate.nickname?.trim()) return candidate.nickname.trim();
   const name = [candidate.first_name, candidate.last_name].filter(Boolean).join(" ").trim();
   if (name) return name;
-  if (candidate.nickname) return candidate.nickname;
   if (candidate.username) return `@${candidate.username}`;
   return `کاربر ${candidate.user_id}`;
 }
@@ -179,17 +179,16 @@ export function ownerIdLabel(ownerUserId: number | null): string {
 
 /* --------------------------------------------------------------- location */
 
-/** This directory covers services located in Germany. */
-export const DEFAULT_COUNTRY = "Germany";
+/** Germany is the initial entry default; other country codes are supported. */
+export const DEFAULT_COUNTRY_CODE = "DE";
 
 export const DEFAULT_COUNTRY_LABEL = "آلمان";
 
 /**
  * The 16 German Bundeslaender, offered as suggestions in the editor.
  *
- * This is a convenience list for data entry, not a controlled reference system:
- * `state` is stored as free text so the product is not locked to Germany
- * forever, and an admin can always type a value that is not listed.
+ * The backend canonicalises German state names against its vocabulary. Other
+ * countries keep their own region names; these suggestions apply only to DE.
  */
 export const BUNDESLAENDER = [
   "Baden-Württemberg",

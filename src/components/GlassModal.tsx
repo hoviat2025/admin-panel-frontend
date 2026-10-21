@@ -1,6 +1,6 @@
-import { ReactNode, useEffect } from "react";
+import { ReactNode, useEffect, useId, useRef } from "react";
 import { X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import "./glass-modal.css";
 
 interface GlassModalProps {
   isOpen: boolean;
@@ -9,54 +9,31 @@ interface GlassModalProps {
   title?: string;
 }
 
-export const GlassModal = ({
-  isOpen,
-  onClose,
-  children,
-  title,
-}: GlassModalProps) => {
+/** Native modal supplies an inert background, focus containment and Escape. */
+export const GlassModal = ({ isOpen, onClose, children, title }: GlassModalProps) => {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
-    }
+    if (!isOpen || !dialog.current) return;
+    const element = dialog.current;
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    element.showModal();
     return () => {
-      document.body.style.overflow = "unset";
+      element.close();
+      document.body.style.overflow = previousOverflow;
+      if (trigger?.isConnected) trigger.focus({ preventScroll: true });
     };
   }, [isOpen]);
-
-  if (!isOpen) return null;
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-charcoal/40"
-      style={{ backdropFilter: 'blur(12px)' }}
-      onClick={onClose}
-    >
-      <div
-        className={cn(
-          "w-full max-w-lg max-h-[85vh] rounded-3xl p-6",
-          "bg-white border border-white/80 shadow-2xl"
-        )}
-        style={{ direction: 'rtl' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-6">
-          {title && (
-            <h2 className="text-xl font-bold text-charcoal">{title}</h2>
-          )}
-          <button
-            onClick={onClose}
-            className="rounded-full p-2 hover:bg-silver-light/50 transition-colors mr-auto"
-          >
-            <X className="h-5 w-5 text-charcoal" />
-          </button>
-        </div>
-        <div className="text-charcoal">
-          {children}
-        </div>
-      </div>
-    </div>
-  );
+  return <dialog ref={dialog} className="admin-glass-dialog" aria-labelledby={titleId}
+    onCancel={(event) => { event.preventDefault(); onClose(); }}
+    onClick={(event) => {
+      if (event.target !== event.currentTarget) return;
+      const box = event.currentTarget.getBoundingClientRect();
+      if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) onClose();
+    }}>
+    <header className="admin-glass-dialog__header"><h2 id={titleId}>{title || "جزئیات"}</h2><button type="button" aria-label="بستن" onClick={onClose}><X size={20} /></button></header>
+    <div className="admin-glass-dialog__body">{isOpen && children}</div>
+  </dialog>;
 };

@@ -4,6 +4,12 @@ import {
   ArrowDown,
   ArrowUp,
   Check,
+  CheckCircle2,
+  AlertCircle,
+  ArrowRight,
+  Store,
+  Tags,
+  Phone,
   Loader2,
   Plus,
   Save,
@@ -11,9 +17,6 @@ import {
   User,
   X,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { GlassBox } from "@/components/GlassBox";
 import { Header } from "@/components/Header";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -23,14 +26,21 @@ import {
   createService,
   fetchCategories,
   fetchService,
+  fetchLocationCatalogue,
+  createLocationCity,
+  type LocationCountry,
   saveServiceAggregate,
   searchOwnerCandidates,
+  uploadServiceCoverImage,
+  removeServiceCoverImage,
+  ServiceApiError,
 } from "@/lib/serviceApi";
+import ServiceCoverImage from "@/components/services/ServiceCoverImage";
+import { CONTACT_METHODS, buildGuidedContact, contactMethodOf, contactValueIssue, friendlyContactValue, type ContactMethodKey } from "@/lib/serviceContacts";
+import "./service-editor.css";
 import {
-  BUNDESLAENDER,
-  CONTACT_TYPE_HINTS,
   CONTACT_TYPE_LABELS,
-  DEFAULT_COUNTRY,
+  DEFAULT_COUNTRY_CODE,
   PERSIAN_FLAG_OPTIONS,
   RELEVANCE_ANSWER_LABELS,
   RELEVANCE_ANSWER_OPTIONS,
@@ -38,7 +48,7 @@ import {
   STATUS_LABELS,
   checkPublishRequirements,
   ownerLabel,
-  platformLabel,
+  formatDateTime,
 } from "@/lib/serviceDisplay";
 import {
   Category,
@@ -48,6 +58,7 @@ import {
   RelevanceAnswerChoice,
   ServiceCategoryInput,
   ServiceContactInput,
+  ServiceCreatePayload,
   ServiceStatus,
   SERVICE_STATUSES,
   relevanceAnswerToChoice,
@@ -65,13 +76,11 @@ import {
  * obviously invalid submit (publish needs one primary category, provenance is
  * paired, coordinates are a pair), but every server message is surfaced as-is.
  *
- * Save order matters for an existing service: contacts and categories are written
- * first, then the scalar patch. Publishing is validated against the stored
- * categories, so writing them first means switching to "published" in the same
- * save works.
+ * Existing services save their whole editable aggregate atomically, including
+ * contacts and categories, with a token that detects concurrent changes.
  */
 
-type ContactRow = ServiceContactInput & { key: string };
+type ContactRow = ServiceContactInput & { key: string; method: ContactMethodKey };
 
 let contactKeySeed = 0;
 const nextKey = () => {
@@ -86,19 +95,13 @@ type SectionProps = {
 };
 
 const Section = ({ title, description, children }: SectionProps) => (
-  <GlassBox className="space-y-4 p-5">
-    <div>
-      <h3 className="font-bold text-charcoal">{title}</h3>
-      {description && <p className="mt-1 text-xs text-silver">{description}</p>}
-    </div>
-    {children}
-  </GlassBox>
+  <section className="se-section"><header className="se-section__heading"><h3>{title}</h3>{description && <p>{description}</p>}</header><div className="se-section__body">{children}</div></section>
 );
 
 const FieldLabel = ({ children, hint }: { children: React.ReactNode; hint?: string }) => (
-  <label className="block space-y-1">
-    <span className="text-sm font-medium text-silver">{children}</span>
-    {hint && <span className="block text-[11px] text-silver">{hint}</span>}
+  <label className="se-field">
+    {children}
+    {hint && <small>{hint}</small>}
   </label>
 );
 
@@ -112,6 +115,19 @@ const ServiceEditor = () => {
 
   const [isLoading, setIsLoading] = useState(!isNew);
   const [isSaving, setIsSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState("identity");
+  const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
+  const [pendingImage, setPendingImage] = useState<File | null>(null);
+  const [removeImageRequested, setRemoveImageRequested] = useState(false);
+  const [categorySearch, setCategorySearch] = useState("");
+  const [openCategoryGroups, setOpenCategoryGroups] = useState<Set<number>>(new Set());
+  const [isChoosingContact, setIsChoosingContact] = useState(false);
+  const tabs = [
+    { key: "identity", label: "اطلاعات و تصویر", icon: Store },
+    { key: "classification", label: "دسته و ویژگی‌ها", icon: Tags },
+    { key: "contacts", label: "راه‌های ارتباط", icon: Phone },
+    { key: "ownership", label: "مالک و منبع", icon: User },
+  ];
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -119,10 +135,15 @@ const ServiceEditor = () => {
   const [address, setAddress] = useState("");
   const [postalCode, setPostalCode] = useState("");
   const [city, setCity] = useState("");
-  /** Bundesland. Free text in the backend; the list below only suggests values. */
+  const [locationCatalogue, setLocationCatalogue] = useState<LocationCountry[]>([]);
+  const [locationError, setLocationError] = useState("");
+  const [isLoadingLocations, setIsLoadingLocations] = useState(true);
+  const [newCity, setNewCity] = useState("");
+  const [isAddingCity, setIsAddingCity] = useState(false);
+  /** The backend validates the region using the selected country's vocabulary. */
   const [state, setState] = useState("");
   // Germany is the normal default, so the admin does not retype it every time.
-  const [country, setCountry] = useState(DEFAULT_COUNTRY);
+  const [countryCode, setCountryCode] = useState(DEFAULT_COUNTRY_CODE);
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
 
@@ -185,11 +206,14 @@ const ServiceEditor = () => {
         setIsStale(false);
         setName(service.name ?? "");
         setDescription(service.description ?? "");
+        setCoverImageUrl(service.cover_image_url ?? null);
+        setPendingImage(null);
+        setRemoveImageRequested(false);
         setAddress(service.address ?? "");
         setPostalCode(service.postal_code ?? "");
         setCity(service.city ?? "");
         setState(service.state ?? "");
-        setCountry(service.country ?? "");
+        setCountryCode(service.country_code ?? "");
         setLatitude(service.latitude === null ? "" : String(service.latitude));
         setLongitude(service.longitude === null ? "" : String(service.longitude));
         setPersianOwned(relevanceAnswerToChoice(service.persian_owned));
@@ -208,6 +232,7 @@ const ServiceEditor = () => {
         setContacts(
           (service.contacts ?? []).map((contact) => ({
             key: nextKey(),
+            method: contactMethodOf(contact),
             title: contact.title,
             type: contact.type,
             value: contact.value,
@@ -234,37 +259,48 @@ const ServiceEditor = () => {
     };
   }, [isNew, numericId, navigate, toast]);
 
+  const loadLocations = useCallback(async () => {
+    setIsLoadingLocations(true);
+    try {
+      const next = await fetchLocationCatalogue();
+      setLocationCatalogue(next);
+      setLocationError("");
+      return next;
+    } catch (error) {
+      setLocationError(error instanceof Error ? error.message : "دریافت شهرها ناموفق بود.");
+      return null;
+    } finally { setIsLoadingLocations(false); }
+  }, []);
+  useEffect(() => { loadLocations(); }, [loadLocations]);
+  const locationStates = locationCatalogue.find((country) => country.country_code === countryCode)?.states ?? [];
+  const selectedLocationState = locationStates.find((region) => region.state.localeCompare(state, undefined, { sensitivity: "base" }) === 0);
+  const selectedLocationCity = selectedLocationState?.cities.find((place) => place.city.localeCompare(city, undefined, { sensitivity: "base" }) === 0);
+  const addCity = async () => {
+    if (!selectedLocationState || !newCity.trim() || isAddingCity) return;
+    setIsAddingCity(true);
+    try {
+      await createLocationCity(selectedLocationState.id, newCity.trim());
+      const next = await loadLocations();
+      const saved = next?.find((country) => country.country_code === countryCode)?.states.find((region) => region.id === selectedLocationState.id)?.cities.find((place) => place.city.localeCompare(newCity.trim(), undefined, { sensitivity: "base" }) === 0);
+      if (saved) { setState(selectedLocationState.state); setCity(saved.city); setNewCity(""); }
+      toast({ title: "شهر به فهرست مشترک اضافه شد" });
+    } catch (error) { toast({ variant: "destructive", title: "افزودن شهر انجام نشد", description: error instanceof Error ? error.message : "دوباره تلاش کنید." }); }
+    finally { setIsAddingCity(false); }
+  };
+
   /* -------------------------------------------------------------- category UI */
 
-  /** Categories ordered by their parent, so the tree reads top-down. */
-  const orderedCategories = useMemo(() => {
-    const byParent = new Map<number | null, Category[]>();
-    categories.forEach((category) => {
-      const key = category.parent_id ?? null;
-      const bucket = byParent.get(key) ?? [];
-      bucket.push(category);
-      byParent.set(key, bucket);
-    });
-    byParent.forEach((bucket) =>
-      bucket.sort((a, b) => a.display_order - b.display_order || a.id - b.id),
-    );
-
-    const result: Array<{ category: Category; depth: number }> = [];
-    const walk = (parentId: number | null, depth: number) => {
-      (byParent.get(parentId) ?? []).forEach((category) => {
-        result.push({ category, depth });
-        walk(category.id, depth + 1);
-      });
-    };
-    walk(null, 0);
-    // Any category whose parent is inactive/missing still needs to be selectable.
-    categories
-      .filter((category) => !result.some((item) => item.category.id === category.id))
-      .forEach((category) => result.push({ category, depth: 0 }));
-    return result;
+  const categoryGroups = useMemo(() => {
+    const ordered = [...categories].sort((a, b) => a.display_order - b.display_order || a.id - b.id);
+    return ordered.filter((category) => category.level === 1).map((group) => ({
+      group,
+      children: ordered.filter((category) => category.level === 2 && (category.parent_ids ?? [category.parent_id]).includes(group.id)),
+    }));
   }, [categories]);
+  const assignableCategoryIds = useMemo(() => new Set(categories.filter((category) => category.level === 2).map((category) => category.id)), [categories]);
 
   const toggleCategory = (categoryId: number) => {
+    if (!assignableCategoryIds.has(categoryId)) return;
     setSelectedCategoryIds((previous) => {
       if (previous.includes(categoryId)) {
         if (primaryCategoryId === categoryId) setPrimaryCategoryId(null);
@@ -275,6 +311,7 @@ const ServiceEditor = () => {
   };
 
   const choosePrimary = (categoryId: number) => {
+    if (!assignableCategoryIds.has(categoryId)) return;
     setSelectedCategoryIds((previous) =>
       previous.includes(categoryId) ? previous : [...previous, categoryId],
     );
@@ -283,22 +320,25 @@ const ServiceEditor = () => {
 
   /* -------------------------------------------------------------- contacts UI */
 
-  const addContact = () => {
+  const addContact = (methodKey: ContactMethodKey) => {
+    const method = CONTACT_METHODS.find((option) => option.key === methodKey)!;
+    setIsChoosingContact(false);
     setContacts((previous) => [
       ...previous,
       {
         key: nextKey(),
-        title: "",
-        type: "phone",
+        method: method.key,
+        title: method.label,
+        type: method.type as ContactType,
         value: "",
-        platform: "",
+        platform: method.platform ?? "",
         display_order: previous.length,
         is_visible: true,
       },
     ]);
   };
 
-  const updateContact = (key: string, patch: Partial<ServiceContactInput>) => {
+  const updateContact = (key: string, patch: Partial<Omit<ContactRow, "key">>) => {
     setContacts((previous) =>
       previous.map((row) => (row.key === key ? { ...row, ...patch } : row)),
     );
@@ -346,19 +386,25 @@ const ServiceEditor = () => {
 
   const localIssue = useMemo(() => {
     if (!name.trim()) return "نام سرویس الزامی است.";
+    if (countryCode.trim() && !/^[A-Za-z]{2}$/.test(countryCode.trim())) {
+      return "کد کشور باید دو حرف لاتین باشد؛ مثلاً DE، AT یا CH.";
+    }
+    if (state && !selectedLocationState) return "ایالت را از فهرست تعریف‌شده انتخاب کنید.";
+    if (city && !selectedLocationCity) return "شهر را از فهرست تعریف‌شده انتخاب کنید.";
     if ((latitude === "") !== (longitude === "")) {
       return "عرض جغرافیایی و طول جغرافیایی باید با هم وارد شوند.";
     }
+    if (latitude !== "" && (!Number.isFinite(Number(latitude)) || Math.abs(Number(latitude)) > 90)) return "عرض جغرافیایی باید عددی بین ۹۰- و ۹۰ باشد.";
+    if (longitude !== "" && (!Number.isFinite(Number(longitude)) || Math.abs(Number(longitude)) > 180)) return "طول جغرافیایی باید عددی بین ۱۸۰- و ۱۸۰ باشد.";
     if ((source.trim() === "") !== (externalId.trim() === "")) {
       return "منبع و شناسه خارجی باید با هم وارد شوند یا هر دو خالی بمانند.";
     }
-    const incomplete = contacts.find(
-      (row) => !row.title.trim() || !row.value.trim(),
-    );
-    if (incomplete) return "هر ردیف اطلاعات تماس به عنوان و مقدار نیاز دارد.";
+    const incomplete = contacts.find((row) => !row.title.trim() || contactValueIssue(row));
+    if (incomplete) return !incomplete.title.trim() ? "عنوان راه ارتباطی را مشخص کنید." : contactValueIssue(incomplete);
+    if (selectedCategoryIds.some((id) => !assignableCategoryIds.has(id))) return "گروه‌ها قابل انتساب نیستند؛ دسته‌های سطح دوم را انتخاب کنید.";
     if (!publishCheck.ok) return publishCheck.message;
     return null;
-  }, [name, latitude, longitude, source, externalId, contacts, publishCheck]);
+  }, [name, countryCode, latitude, longitude, source, externalId, contacts, publishCheck, selectedCategoryIds, assignableCategoryIds, state, city, selectedLocationState, selectedLocationCity]);
 
   const buildCategoryPayload = (): ServiceCategoryInput[] =>
     selectedCategoryIds.map((categoryId) => ({
@@ -366,17 +412,10 @@ const ServiceEditor = () => {
       is_primary: categoryId === primaryCategoryId,
     }));
 
-  const buildContactPayload = (): ServiceContactInput[] =>
-    contacts.map((row, index) => ({
-      title: row.title.trim(),
-      type: row.type,
-      value: row.value.trim(),
-      platform: row.platform.trim() || null,
-      display_order: index,
-      is_visible: row.is_visible,
-    }));
+  const buildContactPayload = (): ServiceContactInput[] => contacts.map(buildGuidedContact);
 
   const handleSave = async () => {
+    if (isSaving || isStale) return;
     if (localIssue) {
       toast({ variant: "destructive", title: "بررسی فرم", description: localIssue });
       return;
@@ -384,14 +423,14 @@ const ServiceEditor = () => {
 
     setIsSaving(true);
     try {
-      const aggregate = {
+      const aggregate: ServiceCreatePayload = {
         name: name.trim(),
         description: description.trim() || null,
         address: address.trim() || null,
         postal_code: postalCode.trim() || null,
-        city: city.trim() || null,
-        state: state.trim() || null,
-        country: country.trim() || null,
+        city: selectedLocationCity?.city ?? null,
+        state: selectedLocationState?.state ?? null,
+        country_code: countryCode.trim().toUpperCase() || null,
         latitude: latitude === "" ? null : Number(latitude),
         longitude: longitude === "" ? null : Number(longitude),
         // "unknown" is sent as null, never as false.
@@ -408,32 +447,44 @@ const ServiceEditor = () => {
         categories: buildCategoryPayload(),
       };
 
-      if (isNew) {
-        const created = await createService(aggregate);
-        toast({ title: "سرویس ایجاد شد", description: created.name });
-        navigate(`/services/${created.id}`);
-        return;
-      }
-
       /* One request for the whole aggregate: scalars, owner, show_owner,
          contacts and categories commit together or not at all. The loaded
          updated_at is mandatory and lets the backend refuse a stale save. */
-      if (!loadedUpdatedAt) {
-        throw new Error("this service could not be loaded, so a safe save is not possible");
+      if (!isNew && !loadedUpdatedAt) {
+        throw new Error("اطلاعات کسب‌وکار کامل بارگذاری نشده است؛ صفحه را دوباره بارگذاری کنید.");
       }
-      const saved = await saveServiceAggregate(numericId as number, {
-        ...aggregate,
-        expected_updated_at: loadedUpdatedAt,
+      let saved = isNew ? await createService(aggregate) : await saveServiceAggregate(numericId as number, {
+        ...aggregate, expected_updated_at: loadedUpdatedAt as string,
       });
       setLoadedUpdatedAt(saved.updated_at);
       setIsStale(false);
-      toast({ title: "سرویس به‌روزرسانی شد" });
-      navigate("/services");
+      if (pendingImage || removeImageRequested) {
+        try {
+          saved = pendingImage
+            ? await uploadServiceCoverImage(saved.id, pendingImage, saved.updated_at)
+            : await removeServiceCoverImage(saved.id, saved.updated_at);
+          setLoadedUpdatedAt(saved.updated_at);
+          setCoverImageUrl(saved.cover_image_url ?? null);
+          setPendingImage(null);
+          setRemoveImageRequested(false);
+        } catch (error) {
+          const stale = error instanceof ServiceApiError && error.status === 409;
+          if (stale) setIsStale(true);
+          toast({ variant: "destructive", title: "اطلاعات ذخیره شد؛ تغییر تصویر انجام نشد", description: error instanceof Error ? error.message : "تصویر را دوباره انتخاب و ذخیره کنید." });
+          setActiveTab("identity");
+          // A created listing already exists even if image storage is unavailable.
+          // Opening its editor prevents a retry from creating a duplicate listing.
+          if (isNew) navigate(`/services/${saved.id}`);
+          return;
+        }
+      }
+      toast({ title: isNew ? "کسب‌وکار ایجاد شد" : "تغییرات کسب‌وکار ذخیره شد" });
+      navigate(isNew ? `/services/${saved.id}` : "/services");
     } catch (error) {
       const message = error instanceof Error ? error.message : "ذخیره سرویس ناموفق بود.";
       /* 409 means another admin saved this service since it was loaded. The
          data on screen is stale, so offer a reload rather than retrying. */
-      if (/changed by someone else/i.test(message)) {
+      if ((error instanceof ServiceApiError && error.status === 409 && /reload/i.test(message)) || /changed by someone else/i.test(message)) {
         setIsStale(true);
       }
       toast({
@@ -447,527 +498,138 @@ const ServiceEditor = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen pb-24">
-        <Header />
-        <div className="flex h-[40vh] items-center justify-center">
-          <Loader2 className="h-10 w-10 animate-spin text-gold" />
-        </div>
-      </div>
-    );
+    return <div className="service-editor-page" dir="rtl"><Header /><div className="se-loading" role="status"><Loader2 className="animate-spin" size={28} /><p>در حال دریافت اطلاعات کسب‌وکار…</p></div></div>;
   }
 
-  return (
-    <div className="min-h-screen pb-24">
-      <Header />
-      <main className="container mx-auto max-w-4xl space-y-4 px-4 py-6">
-        <h2 className="text-xl font-bold text-charcoal">
-          {isNew ? "سرویس جدید" : `ویرایش سرویس #${numericId}`}
-        </h2>
+  const mainCategory = categories.find((category) => category.id === primaryCategoryId)?.name;
+  const assessments = [persianOwned, persianProvider, persianLanguage, persianService];
+  const changeImage = (file: File | null, remove: boolean) => { setPendingImage(file); setRemoveImageRequested(remove); };
 
-        {/* Shown when the save was refused because someone else changed this
-            service after it was loaded. Retrying would overwrite their work. */}
-        {isStale && (
-          <div className="flex items-start justify-between gap-3 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm">
-            <div>
-              <p className="font-bold text-charcoal">
-                این سرویس در فاصلهٔ باز کردن صفحه توسط شخص دیگری تغییر کرده است.
-              </p>
-              <p className="text-silver">
-                برای اینکه تغییرات آن شخص بازنویسی نشود، صفحه را دوباره بارگذاری کنید و
-                سپس تغییرات خود را دوباره اعمال کنید.
-              </p>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
-              بارگذاری دوباره
-            </Button>
-          </div>
-        )}
+  return <div className="service-editor-page" dir="rtl">
+    <Header />
+    <main className="se-shell">
+      <header className="se-page-heading">
+        <div><button type="button" className="se-back" onClick={() => navigate("/services")}><ArrowRight size={16} />کسب‌وکارها</button><div className="se-title-row"><h1>{isNew ? "افزودن کسب‌وکار" : "ویرایش کسب‌وکار"}</h1>{!isNew && <span className="se-record-id">#{numericId}</span>}</div><p>{isNew ? "اطلاعات، تصویر و راه‌های ارتباط کسب‌وکار را یک‌جا ثبت کنید." : name || "اطلاعات کسب‌وکار را بررسی و به‌روز کنید."}</p></div>
+        <span className={`se-status se-status--${status}`}>{STATUS_LABELS[status]}</span>
+      </header>
 
-        {/* ------------------------------------------------------- basic */}
-        <Section title="اطلاعات پایه">
-          <FieldLabel>
-            نام سرویس
-            <Input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="مثلاً رستوران کاپریزه"
-              className="mt-1 rounded-xl bg-secondary/50"
-            />
-          </FieldLabel>
-          <FieldLabel>
-            توضیح
-            <Textarea
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              rows={4}
-              placeholder="معرفی کوتاه سرویس"
-              className="mt-1 rounded-xl bg-secondary/50"
-            />
-          </FieldLabel>
-        </Section>
+      {isStale && <div className="se-alert" role="alert"><AlertCircle size={21} /><div><strong>اطلاعات این کسب‌وکار تغییر کرده است.</strong><p>برای دریافت آخرین تغییرات، صفحه را دوباره بارگذاری کنید. تغییرات ذخیره‌نشدهٔ شما از دست می‌روند.</p></div><button className="se-button se-button--outline" type="button" onClick={() => window.location.reload()}>بارگذاری دوباره</button></div>}
 
-        {/* ---------------------------------------------------- location */}
-        <Section
-          title="موقعیت"
-          description="این سرویس در آلمان واقع شده است. نشانی ساختاریافته است و در جست‌وجو استفاده می‌شود."
-        >
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <FieldLabel>
-              نشانی
-              <Input
-                value={address}
-                onChange={(event) => setAddress(event.target.value)}
-                className="mt-1 rounded-xl bg-secondary/50"
-              />
-            </FieldLabel>
-            <FieldLabel>
-              کد پستی
-              <Input
-                dir="ltr"
-                value={postalCode}
-                onChange={(event) => setPostalCode(event.target.value)}
-                className="mt-1 rounded-xl bg-secondary/50"
-              />
-            </FieldLabel>
-            <FieldLabel>
-              شهر
-              <Input
-                value={city}
-                onChange={(event) => setCity(event.target.value)}
-                placeholder="مثلاً فرانکفورت"
-                className="mt-1 rounded-xl bg-secondary/50"
-              />
-            </FieldLabel>
-            <FieldLabel hint="ایالت آلمان. اگر در فهرست نبود می‌توانید دستی بنویسید.">
-              Bundesland
-              <Input
-                dir="ltr"
-                list="bundeslaender"
-                value={state}
-                onChange={(event) => setState(event.target.value)}
-                placeholder="مثلاً Hessen"
-                className="mt-1 rounded-xl bg-secondary/50"
-              />
-            </FieldLabel>
-            <FieldLabel hint="پیش‌فرض این سامانه آلمان است.">
-              کشور
-              <Input
-                dir="ltr"
-                value={country}
-                onChange={(event) => setCountry(event.target.value)}
-                className="mt-1 rounded-xl bg-secondary/50"
-              />
-            </FieldLabel>
-            <FieldLabel hint="هر دو یا هیچ‌کدام.">
-              عرض جغرافیایی
-              <Input
-                dir="ltr"
-                value={latitude}
-                onChange={(event) => setLatitude(event.target.value)}
-                placeholder="50.1109"
-                className="mt-1 rounded-xl bg-secondary/50"
-              />
-            </FieldLabel>
-            <FieldLabel hint="هر دو یا هیچ‌کدام.">
-              طول جغرافیایی
-              <Input
-                dir="ltr"
-                value={longitude}
-                onChange={(event) => setLongitude(event.target.value)}
-                placeholder="8.6821"
-                className="mt-1 rounded-xl bg-secondary/50"
-              />
-            </FieldLabel>
-          </div>
-          <datalist id="bundeslaender">
-            {BUNDESLAENDER.map((name) => (
-              <option key={name} value={name} />
-            ))}
-          </datalist>
-        </Section>
+      <div className="se-layout">
+        <div className="se-main-column">
+          <nav className="se-tabs" role="tablist" aria-label="بخش‌های ویرایش کسب‌وکار">
+            {tabs.map((tab, index) => <button key={tab.key} id={`se-tab-${tab.key}`} data-editor-tab={tab.key} type="button" role="tab" tabIndex={activeTab === tab.key ? 0 : -1} aria-selected={activeTab === tab.key} aria-controls={`se-panel-${tab.key}`} onClick={() => setActiveTab(tab.key)} onKeyDown={(event) => {
+              let next = index;
+              if (event.key === "ArrowLeft") next = (index + 1) % tabs.length;
+              else if (event.key === "ArrowRight") next = (index + tabs.length - 1) % tabs.length;
+              else if (event.key === "Home") next = 0;
+              else if (event.key === "End") next = tabs.length - 1;
+              else return;
+              event.preventDefault(); setActiveTab(tabs[next].key);
+              event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`[data-editor-tab="${tabs[next].key}"]`)?.focus();
+            }}><tab.icon size={18} /><span>{tab.label}</span></button>)}
+          </nav>
 
-        {/* ------------------------------------- iranian / persian relevance */}
-        <Section
-          title="نشانه‌های ایرانی و فارسی"
-          description="این چهار مورد مستقل هستند و هر ترکیبی مجاز است. هیچ‌کدام ربطی به محل سرویس ندارد؛ سرویس در آلمان است و این‌ها ویژگی مالک، ارائه‌دهنده، زبان یا نوع خدمت هستند. اگر چیزی را نمی‌دانید «نامشخص» را انتخاب کنید تا با «خیر» اشتباه نشود."
-        >
-          {PERSIAN_FLAG_OPTIONS.map((option) => {
-            const item =
-              option.key === "persian_owned"
-                ? { label: option.label, hint: option.hint, value: persianOwned, setter: setPersianOwned }
-                : option.key === "persian_provider"
-                  ? { label: option.label, hint: option.hint, value: persianProvider, setter: setPersianProvider }
-                  : option.key === "persian_language"
-                    ? { label: option.label, hint: option.hint, value: persianLanguage, setter: setPersianLanguage }
-                    : { label: option.label, hint: option.hint, value: persianService, setter: setPersianService };
-            return (
-              <div
-                key={option.key}
-                className="flex flex-col gap-3 rounded-xl border bg-secondary/30 p-3 sm:flex-row sm:items-start sm:justify-between"
-              >
-                <div>
-                  <p className="text-sm font-medium text-charcoal">{option.label}</p>
-                  <p className="mt-1 text-xs text-silver">{option.hint}</p>
+          <fieldset className="se-editable" disabled={isSaving}><legend className="sr-only">اطلاعات کسب‌وکار</legend><div role="tabpanel" id={`se-panel-${activeTab}`} aria-labelledby={`se-tab-${activeTab}`} className="se-tab-panel">
+            {activeTab === "identity" && <>
+              <Section title="اطلاعات اصلی" description="نام و معرفی‌ای که در صفحهٔ کسب‌وکار دیده می‌شود.">
+                <FieldLabel>نام کسب‌وکار <span className="se-required">ضروری</span><Input value={name} onChange={(event) => setName(event.target.value)} maxLength={300} placeholder="مثلاً رستوران، کلینیک یا فروشگاه…" /></FieldLabel>
+                <FieldLabel hint="خدمات و ویژگی‌های کسب‌وکار را کوتاه و روشن معرفی کنید.">معرفی کسب‌وکار<Textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={4} placeholder="چه خدماتی ارائه می‌شود؟" /></FieldLabel>
+              </Section>
+              <Section title="تصویر معرفی" description="این تصویر در فهرست و صفحهٔ عمومی کسب‌وکار استفاده می‌شود."><ServiceCoverImage savedUrl={coverImageUrl} file={pendingImage} removeRequested={removeImageRequested} disabled={isSaving} onChange={changeImage} /></Section>
+              <Section title="نشانی و موقعیت" description="کشور، ایالت و شهر به پیدا شدن کسب‌وکار در جستجو کمک می‌کنند.">
+                <div className="se-form-grid">
+                  <FieldLabel>کشور<select value={countryCode} onChange={(event) => { setCountryCode(event.target.value); setState(""); setCity(""); }} disabled={isLoadingLocations}><option value="">انتخاب کشور</option>{locationCatalogue.map((country) => <option key={country.country_code} value={country.country_code}>{country.country_code === "DE" ? "آلمان" : country.country_code}</option>)}{countryCode && !locationCatalogue.some((country) => country.country_code === countryCode) && <option value={countryCode}>{countryCode}</option>}</select></FieldLabel>
+                  <FieldLabel>ایالت<select value={selectedLocationState?.state ?? state} disabled={isLoadingLocations || !countryCode} onChange={(event) => { setState(event.target.value); setCity(""); setNewCity(""); }}><option value="">انتخاب ایالت</option>{locationStates.map((region) => <option key={region.id} value={region.state}>{region.state}</option>)}{state && !selectedLocationState && <option value={state} disabled>{state} — نیاز به انتخاب مجدد</option>}</select></FieldLabel>
+                  <FieldLabel>شهر<select value={selectedLocationCity?.city ?? city} disabled={isLoadingLocations || !selectedLocationState} onChange={(event) => setCity(event.target.value)}><option value="">{selectedLocationState ? "انتخاب شهر" : "ابتدا ایالت را انتخاب کنید"}</option>{selectedLocationState?.cities.map((place) => <option key={place.id} value={place.city}>{place.city}</option>)}{city && !selectedLocationCity && <option value={city} disabled>{city} — نیاز به انتخاب مجدد</option>}</select></FieldLabel>
+                  <FieldLabel>کد پستی<Input dir="ltr" value={postalCode} onChange={(event) => setPostalCode(event.target.value)} placeholder="60311" /></FieldLabel>
+                  <div className="se-full-width"><FieldLabel>نشانی کامل<Input value={address} onChange={(event) => setAddress(event.target.value)} placeholder="خیابان، پلاک و جزئیات نشانی" /></FieldLabel></div>
                 </div>
-                {/* Three explicit states. A two-way switch could not express
-                    "not assessed", which is the whole point of the field. */}
-                <div
-                  role="radiogroup"
-                  aria-label={option.label}
-                  className="flex shrink-0 gap-1 rounded-full bg-secondary/60 p-1"
-                >
-                  {RELEVANCE_ANSWER_OPTIONS.map((choice) => (
-                    <button
-                      key={choice}
-                      type="button"
-                      role="radio"
-                      aria-checked={item.value === choice}
-                      onClick={() => item.setter(choice)}
-                      className={`rounded-full px-3 py-1 text-xs transition ${
-                        item.value === choice
-                          ? "bg-white font-bold text-charcoal shadow-sm"
-                          : "text-silver hover:text-charcoal"
-                      }`}
-                    >
-                      {RELEVANCE_ANSWER_LABELS[choice]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </Section>
+                {locationError && <p className="se-small-note" role="alert">{locationError} <button type="button" onClick={loadLocations}>تلاش دوباره</button></p>}
+                {selectedLocationState && <details className="se-add-city"><summary>شهر موردنظر در فهرست نیست؟</summary><p>نام رسمی شهر در {selectedLocationState.state} را وارد کنید. این شهر به فهرست مشترک همهٔ کسب‌وکارها اضافه می‌شود.</p><div><Input dir="auto" aria-label="نام رسمی شهر جدید" value={newCity} onChange={(event) => setNewCity(event.target.value)} placeholder="نام رسمی شهر" /><button type="button" className="se-button se-button--outline" disabled={!newCity.trim() || isAddingCity} onClick={addCity}>{isAddingCity ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}افزودن شهر</button></div></details>}
+                <details className="se-details" open={Boolean(latitude || longitude)}><summary>مختصات جغرافیایی <span>اختیاری</span></summary><div className="se-form-grid"><FieldLabel hint="بین ۹۰- و ۹۰؛ همراه با طول جغرافیایی.">عرض جغرافیایی<Input dir="ltr" type="number" step="any" min={-90} max={90} value={latitude} onChange={(event) => setLatitude(event.target.value)} placeholder="50.1109" /></FieldLabel><FieldLabel hint="بین ۱۸۰- و ۱۸۰؛ همراه با عرض جغرافیایی.">طول جغرافیایی<Input dir="ltr" type="number" step="any" min={-180} max={180} value={longitude} onChange={(event) => setLongitude(event.target.value)} placeholder="8.6821" /></FieldLabel></div></details>
+              </Section>
+            </>}
 
-        {/* --------------------------------------------------- categories */}
-        <Section
-          title="دسته‌بندی‌ها"
-          description="یک سرویس می‌تواند چند دسته داشته باشد، اما فقط یکی می‌تواند اصلی باشد. سرویس پیش‌نویس می‌تواند بدون دسته بماند."
-        >
-          {orderedCategories.length === 0 ? (
-            <p className="rounded-xl border border-dashed p-3 text-center text-xs text-silver">
-              هنوز دسته‌بندی‌ای ساخته نشده است.
-            </p>
-          ) : (
-            <div className="max-h-72 space-y-1 overflow-y-auto rounded-xl border p-2">
-              {orderedCategories.map(({ category, depth }) => {
-                const selected = selectedCategoryIds.includes(category.id);
-                const isPrimary = primaryCategoryId === category.id;
-                const retired = !category.is_active;
-                /* A retired category cannot be newly assigned, but an existing
-                   assignment stays visible and removable. */
-                const cannotAssign = retired && !selected;
-                const cannotBePrimary = retired && !isPrimary;
-                return (
-                  <div
-                    key={category.id}
-                    className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 ${
-                      retired ? "opacity-60" : "hover:bg-secondary/40"
-                    }`}
-                    style={{ paddingInlineStart: `${depth * 16 + 8}px` }}
-                  >
-                    <label className="flex flex-1 items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={selected}
-                        disabled={cannotAssign}
-                        onChange={() => toggleCategory(category.id)}
-                        className="h-4 w-4"
-                      />
-                      <span className={selected ? "text-charcoal" : "text-silver"}>
-                        {category.name}
-                      </span>
-                      {retired && (
-                        <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] text-silver">
-                          {selected ? "غیرفعال (نگه داشته شده)" : "غیرفعال"}
-                        </span>
-                      )}
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => choosePrimary(category.id)}
-                      disabled={cannotBePrimary}
-                      className={`rounded-full px-2 py-0.5 text-[11px] disabled:cursor-not-allowed disabled:opacity-40 ${
-                        isPrimary
-                          ? "bg-secondary font-bold text-charcoal"
-                          : "text-silver hover:bg-secondary/50"
-                      }`}
-                    >
-                      {isPrimary ? "اصلی" : "انتخاب به‌عنوان اصلی"}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          <p className="text-xs text-silver">
-            انتخاب‌شده: {selectedCategoryIds.length} — اصلی:{" "}
-            {primaryCategoryId === null
-              ? "تعیین نشده"
-              : categories.find((c) => c.id === primaryCategoryId)?.name ?? primaryCategoryId}
-          </p>
-        </Section>
-
-        {/* ----------------------------------------------------- contacts */}
-        <Section
-          title="اطلاعات تماس"
-          description="مدل عمومی است: هر ردیف یک روش تماس با عنوان، نوع و مقدار. چند ردیف با نوع یکسان مجاز است."
-        >
-          {contacts.length === 0 ? (
-            <p className="rounded-xl border border-dashed p-3 text-center text-xs text-silver">
-              ردیفی اضافه نشده است.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {contacts.map((row, index) => (
-                <div key={row.key} className="rounded-xl border bg-secondary/20 p-3">
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="text-xs font-medium text-silver">
-                      ردیف {index + 1}
-                      {row.platform && ` — ${platformLabel(row.platform)}`}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        aria-label="انتقال به بالا"
-                        onClick={() => moveContact(index, -1)}
-                        disabled={index === 0}
-                        className="rounded-full p-1 text-silver hover:bg-secondary disabled:opacity-30"
-                      >
-                        <ArrowUp className="h-4 w-4" />
+            {activeTab === "classification" && <>
+              <Section title="دسته‌بندی خدمات" description="ابتدا گروه را باز کنید، سپس دسته‌های مرتبط را انتخاب کنید. یک دستهٔ سطح دوم را اصلی قرار دهید.">
+                <Input value={categorySearch} onChange={(event) => setCategorySearch(event.target.value)} type="search" placeholder="جستجو در دسته‌بندی‌ها…" aria-label="جستجوی دسته‌بندی" />
+                {categoryGroups.length === 0 ? <div className="se-empty"><Tags size={25} /><p>هنوز دسته‌بندی‌ای در دسترس نیست.</p></div> : <div className="se-category-groups">
+                  {categoryGroups.map(({ group, children }) => {
+                    const search = categorySearch.trim().toLocaleLowerCase();
+                    const groupMatches = group.name.toLocaleLowerCase().includes(search);
+                    const visible = children.filter((category) => !search || groupMatches || category.name.toLocaleLowerCase().includes(search));
+                    if (search && !groupMatches && !visible.length) return null;
+                    const expanded = Boolean(search) || openCategoryGroups.has(group.id);
+                    const chosenCount = children.filter((category) => selectedCategoryIds.includes(category.id)).length;
+                    return <section key={group.id} className="se-category-group">
+                      <button className="se-category-group__heading" type="button" aria-expanded={expanded} onClick={() => setOpenCategoryGroups((current) => { const next = new Set(current); if (next.has(group.id)) next.delete(group.id); else next.add(group.id); return next; })}>
+                        <span><Tags size={17} /><strong>{group.name}</strong><small>{children.length.toLocaleString("fa-IR")} دسته{chosenCount ? ` · ${chosenCount.toLocaleString("fa-IR")} انتخاب‌شده` : ""}</small></span><span aria-hidden="true">{expanded ? "−" : "+"}</span>
                       </button>
-                      <button
-                        type="button"
-                        aria-label="انتقال به پایین"
-                        onClick={() => moveContact(index, 1)}
-                        disabled={index === contacts.length - 1}
-                        className="rounded-full p-1 text-silver hover:bg-secondary disabled:opacity-30"
-                      >
-                        <ArrowDown className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        aria-label="حذف ردیف"
-                        onClick={() => removeContact(row.key)}
-                        className="rounded-full p-1 text-destructive hover:bg-secondary"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
+                      {expanded && <div className="se-category-list">{visible.map((category) => {
+                        const selected = selectedCategoryIds.includes(category.id);
+                        const isPrimary = primaryCategoryId === category.id;
+                        const retired = !category.is_active;
+                        return <div key={category.id} className={`se-category ${selected ? "is-selected" : ""} ${retired ? "is-retired" : ""}`}><label><input type="checkbox" checked={selected} disabled={retired && !selected} onChange={() => toggleCategory(category.id)} /><span>{category.name}{retired && <small>غیرفعال</small>}</span></label><button type="button" onClick={() => choosePrimary(category.id)} disabled={retired && !isPrimary} className={isPrimary ? "se-primary-category is-active" : "se-primary-category"}>{isPrimary && <Check size={13} />}{isPrimary ? "دستهٔ اصلی" : "انتخاب اصلی"}</button></div>;
+                      })}{!visible.length && <p className="se-small-note">این گروه هنوز دسته‌ای ندارد.</p>}</div>}
+                    </section>;
+                  })}
+                </div>}
+                {selectedCategoryIds.some((id) => !assignableCategoryIds.has(id)) && <div className="se-legacy-categories"><p>گروه‌های قدیمی را حذف و یک دستهٔ سطح دوم انتخاب کنید:</p>{selectedCategoryIds.filter((id) => !assignableCategoryIds.has(id)).map((id) => <button type="button" key={id} onClick={() => { setSelectedCategoryIds((current) => current.filter((value) => value !== id)); if (primaryCategoryId === id) setPrimaryCategoryId(null); }}>{categories.find((category) => category.id === id)?.name ?? id}<X size={14} /></button>)}</div>}
+                <p className="se-small-note">{selectedCategoryIds.length.toLocaleString("fa-IR")} دسته انتخاب شده · اصلی: {mainCategory ?? "تعیین نشده"}</p>
+              </Section>
+              <Section title="ویژگی‌های ایرانی و فارسی" description="این چهار ویژگی مستقل‌اند. اگر اطلاعات کافی ندارید «نامشخص» را نگه دارید.">
+                <div className="se-relevance-list">{PERSIAN_FLAG_OPTIONS.map((option) => {
+                  const item = option.key === "persian_owned" ? { value: persianOwned, setter: setPersianOwned } : option.key === "persian_provider" ? { value: persianProvider, setter: setPersianProvider } : option.key === "persian_language" ? { value: persianLanguage, setter: setPersianLanguage } : { value: persianService, setter: setPersianService };
+                  return <fieldset key={option.key} className="se-relevance"><legend>{option.label}</legend><p>{option.hint}</p><div className="se-answer-group">{RELEVANCE_ANSWER_OPTIONS.map((choice) => <label key={choice} className={item.value === choice ? "is-selected" : ""}><input type="radio" name={`relevance-${option.key}`} checked={item.value === choice} onChange={() => item.setter(choice)} /><span>{RELEVANCE_ANSWER_LABELS[choice]}</span></label>)}</div></fieldset>;
+                })}</div>
+              </Section>
+            </>}
 
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <Input
-                      value={row.title}
-                      onChange={(event) => updateContact(row.key, { title: event.target.value })}
-                      placeholder="عنوان، مثلاً تلفن رزرو"
-                      className="rounded-xl bg-secondary/50"
-                    />
-                    <select
-                      value={row.type}
-                      onChange={(event) =>
-                        updateContact(row.key, { type: event.target.value as ContactType })
-                      }
-                      className="h-10 w-full rounded-xl border border-silver-light/50 bg-secondary/50 px-3 text-charcoal"
-                    >
-                      {CONTACT_TYPES.map((type) => (
-                        <option key={type} value={type}>
-                          {CONTACT_TYPE_LABELS[type]}
-                        </option>
-                      ))}
-                    </select>
-                    <Input
-                      value={row.value}
-                      onChange={(event) => updateContact(row.key, { value: event.target.value })}
-                      placeholder={CONTACT_TYPE_HINTS[row.type]}
-                      className="rounded-xl bg-secondary/50"
-                    />
-                    <Input
-                      dir="ltr"
-                      value={row.platform ?? ""}
-                      onChange={(event) =>
-                        updateContact(row.key, { platform: event.target.value })
-                      }
-                      placeholder="شبکه، مثلاً instagram یا telegram"
-                      className="rounded-xl bg-secondary/50"
-                    />
-                  </div>
+            {activeTab === "contacts" && <Section title="راه‌های ارتباط با کسب‌وکار" description="روش ارتباط را انتخاب کنید و شماره، ایمیل یا شناسهٔ آن را بنویسید. پیوند صفحه به‌صورت خودکار آماده می‌شود.">
+              {contacts.length === 0 ? <div className="se-empty"><Phone size={27} /><h4>راه ارتباطی ثبت نشده است</h4><p>تلفن، ایمیل، وب‌سایت یا شبکهٔ اجتماعی کسب‌وکار را اضافه کنید.</p></div> : <div className="se-contact-list">{contacts.map((row, index) => {
+                const method = CONTACT_METHODS.find((option) => option.key === row.method)!;
+                return <article key={row.key} className="se-contact"><header><div><span className="se-contact__number">{(index + 1).toLocaleString("fa-IR")}</span><strong>{row.title || method.label}</strong></div><div className="se-contact__tools"><button type="button" aria-label="انتقال به بالا" disabled={index === 0} onClick={() => moveContact(index, -1)}><ArrowUp size={16} /></button><button type="button" aria-label="انتقال به پایین" disabled={index === contacts.length - 1} onClick={() => moveContact(index, 1)}><ArrowDown size={16} /></button><button type="button" className="se-danger-icon" aria-label="حذف روش تماس" onClick={() => removeContact(row.key)}><Trash2 size={16} /></button></div></header>
+                  <div className="se-form-grid se-guided-contact-fields"><FieldLabel>روش ارتباط<select value={row.method} onChange={(event) => {
+                    const next = CONTACT_METHODS.find((option) => option.key === event.target.value)!;
+                    updateContact(row.key, {
+                      method: next.key,
+                      title: !row.title.trim() || row.title === method.label ? next.label : row.title,
+                      ...(next.key === "custom" ? {} : { type: next.type as ContactType, platform: next.platform }),
+                      value: friendlyContactValue(row),
+                    });
+                  }}>{CONTACT_METHODS.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}</select></FieldLabel><FieldLabel hint={method.hint}>{row.method === "phone" || row.method === "whatsapp" ? "شمارهٔ تماس" : row.method === "email" ? "نشانی ایمیل" : row.method === "instagram" || row.method === "telegram" ? "نام کاربری یا پیوند صفحه" : row.method === "website" || row.method === "linkedin" ? "نشانی صفحه" : "اطلاعات ارتباط"}<Input dir={row.method === "custom" ? "auto" : "ltr"} value={friendlyContactValue(row)} onChange={(event) => updateContact(row.key, { value: event.target.value })} placeholder={method.placeholder} inputMode={row.method === "phone" || row.method === "whatsapp" ? "tel" : row.method === "email" ? "email" : "text"} /></FieldLabel></div>
+                  <details className="se-contact-custom" open={row.method === "custom"}><summary>{row.method === "custom" ? "جزئیات روش سفارشی" : "عنوان دلخواه برای این روش ارتباط"}</summary><div className="se-form-grid"><FieldLabel>عنوان نمایشی<Input value={row.title} onChange={(event) => updateContact(row.key, { title: event.target.value })} maxLength={200} placeholder={method.label} /></FieldLabel>{row.method === "custom" && <><FieldLabel>نوع مقدار<select value={row.type} onChange={(event) => updateContact(row.key, { type: event.target.value as ContactType })}>{CONTACT_TYPES.map((type) => <option key={type} value={type}>{CONTACT_TYPE_LABELS[type]}</option>)}</select></FieldLabel><FieldLabel hint="فقط برای شبکه‌های خارج از گزینه‌های آماده.">نام شبکه / پلتفرم<Input dir="ltr" value={row.platform ?? ""} onChange={(event) => updateContact(row.key, { platform: event.target.value })} placeholder="نام شبکه" /></FieldLabel></>}</div></details>
+                  <div className="se-contact-visibility"><label htmlFor={`se-contact-visible-${row.key}`}><strong>نمایش عمومی</strong><span>این راه ارتباط در صفحهٔ کسب‌وکار دیده شود.</span></label><Switch id={`se-contact-visible-${row.key}`} checked={row.is_visible} onCheckedChange={(checked) => updateContact(row.key, { is_visible: checked })} aria-label={"نمایش عمومی " + (row.title || method.label)} /></div>
+                </article>;
+              })}</div>}
+              {isChoosingContact ? <div className="se-contact-picker"><header><strong>کدام راه ارتباط را اضافه می‌کنید؟</strong><button type="button" aria-label="بستن انتخاب روش ارتباط" onClick={() => setIsChoosingContact(false)}><X size={17} /></button></header><div>{CONTACT_METHODS.map((method) => <button key={method.key} type="button" onClick={() => addContact(method.key)}>{method.label}<Plus size={14} /></button>)}</div></div> : <button type="button" className="se-button se-button--outline" onClick={() => setIsChoosingContact(true)}><Plus size={17} />افزودن راه ارتباط</button>}
+            </Section>}
 
-                  <label className="mt-2 flex items-center gap-2 text-xs text-silver">
-                    <input
-                      type="checkbox"
-                      checked={row.is_visible}
-                      onChange={(event) =>
-                        updateContact(row.key, { is_visible: event.target.checked })
-                      }
-                      className="h-4 w-4"
-                    />
-                    در صفحه عمومی نمایش داده شود
-                  </label>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <Button variant="outline" className="rounded-xl" onClick={addContact}>
-            <Plus className="ml-1 h-4 w-4" />
-            افزودن روش تماس
-          </Button>
-        </Section>
-
-        {/* -------------------------------------------- owner / visibility */}
-        <Section
-          title="مالک و نمایش عمومی"
-          description="مالک فقط یک اطلاعات است و به‌تنهایی هیچ دسترسی ویرایشی ایجاد نمی‌کند."
-        >
-          <div className="space-y-2">
-            <span className="text-sm font-medium text-silver">جست‌وجوی کاربر برای مالک</span>
-            <div className="flex gap-2">
-              <Input
-                value={ownerSearch}
-                onChange={(event) => setOwnerSearch(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    runOwnerSearch();
-                  }
-                }}
-                placeholder="نام، نام کاربری یا شناسه"
-                className="rounded-xl bg-secondary/50"
-              />
-              <Button variant="outline" className="rounded-xl" onClick={runOwnerSearch} disabled={isSearchingOwner}>
-                {isSearchingOwner ? <Loader2 className="h-4 w-4 animate-spin" /> : "جست‌وجو"}
-              </Button>
-            </div>
-
-            {ownerResults.length > 0 && (
-              <div className="max-h-48 space-y-1 overflow-y-auto rounded-xl border p-2">
-                {ownerResults.map((candidate) => (
-                  <button
-                    key={candidate.user_id}
-                    type="button"
-                    onClick={() => {
-                      setOwnerUserId(candidate.user_id);
-                      setOwnerResults([]);
-                      setOwnerSearch("");
-                    }}
-                    className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-right text-sm hover:bg-secondary/50"
-                  >
-                    <span className="text-charcoal">{ownerLabel(candidate)}</span>
-                    <span className="text-xs text-silver" dir="ltr">
-                      {candidate.user_id}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between rounded-xl border bg-secondary/30 p-3">
-            <div>
-              <p className="text-sm font-medium text-charcoal">مالک فعلی</p>
-              <p className="mt-1 text-xs text-silver" dir="ltr">
-                {ownerUserId ?? "بدون مالک"}
-              </p>
-            </div>
-            {ownerUserId !== null && (
-              <Button
-                variant="outline"
-                className="rounded-xl"
-                onClick={() => setOwnerUserId(null)}
-              >
-                <X className="ml-1 h-4 w-4" />
-                حذف مالک
-              </Button>
-            )}
-          </div>
-
-          <div className="flex items-start justify-between gap-4 rounded-xl border bg-secondary/30 p-3">
-            <div>
-              <p className="flex items-center gap-2 text-sm font-medium text-charcoal">
-                <User className="h-4 w-4" />
-                نمایش عمومی مالک
-              </p>
-              <p className="mt-1 text-xs text-silver">
-                پیش‌فرض خاموش است. حتی با روشن بودن، نمایش عمومی به تنظیمات حریم خصوصی خود
-                کاربر هم وابسته است.
-              </p>
-            </div>
-            <Switch checked={showOwner} onCheckedChange={setShowOwner} />
-          </div>
-        </Section>
-
-        {/* --------------------------------------------- status / publish */}
-        <Section title="وضعیت انتشار" description={STATUS_HINTS[status]}>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {SERVICE_STATUSES.map((option) => (
-              <button
-                key={option}
-                type="button"
-                onClick={() => setStatus(option)}
-                className={`rounded-xl border px-3 py-2 text-sm ${
-                  status === option
-                    ? "border-gold bg-secondary font-bold text-charcoal"
-                    : "text-silver hover:bg-secondary/40"
-                }`}
-              >
-                {STATUS_LABELS[option]}
-              </button>
-            ))}
-          </div>
-          {!publishCheck.ok && (
-            <p className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
-              {publishCheck.message}
-            </p>
-          )}
-        </Section>
-
-        {/* ---------------------------------------------------- provenance */}
-        <Section
-          title="منبع داده"
-          description="برای سرویس‌های واردشده از بیرون. منبع و شناسه باید با هم وارد شوند یا هر دو خالی بمانند."
-        >
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <FieldLabel hint="مثلاً atlas یا manual">
-              منبع
-              <Input
-                dir="ltr"
-                value={source}
-                onChange={(event) => setSource(event.target.value)}
-                className="mt-1 rounded-xl bg-secondary/50"
-              />
-            </FieldLabel>
-            <FieldLabel hint="شناسه پایدار در همان منبع؛ نباید تکراری باشد.">
-              شناسه خارجی
-              <Input
-                dir="ltr"
-                value={externalId}
-                onChange={(event) => setExternalId(event.target.value)}
-                className="mt-1 rounded-xl bg-secondary/50"
-              />
-            </FieldLabel>
-          </div>
-        </Section>
-
-        {localIssue && (
-          <p className="rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-            {localIssue}
-          </p>
-        )}
-
-        <div className="sticky bottom-0 flex gap-3 border-t bg-white/95 py-4">
-          <Button variant="gold" className="flex-1 rounded-xl" onClick={handleSave} disabled={isSaving}>
-            {isSaving ? <Loader2 className="ml-1 h-4 w-4 animate-spin" /> : <Save className="ml-1 h-4 w-4" />}
-            ذخیره
-          </Button>
-          <Button variant="outline" className="rounded-xl" onClick={() => navigate("/services")}>
-            انصراف
-          </Button>
+            {activeTab === "ownership" && <>
+              <Section title="مالک کسب‌وکار" description="حساب مرتبط با این کسب‌وکار را پیدا و انتخاب کنید.">
+                <div className="se-owner-search"><Input value={ownerSearch} onChange={(event) => setOwnerSearch(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); runOwnerSearch(); } }} placeholder="نام، نام کاربری یا شناسهٔ کاربر" aria-label="جستجوی مالک" /><button type="button" className="se-button se-button--outline" onClick={runOwnerSearch} disabled={isSearchingOwner}>{isSearchingOwner ? <Loader2 size={17} className="animate-spin" /> : "جستجو"}</button></div>
+                {ownerResults.length > 0 && <div className="se-owner-results">{ownerResults.map((candidate) => <button key={candidate.user_id} type="button" onClick={() => { setOwnerUserId(candidate.user_id); setOwnerResults([]); setOwnerSearch(""); }}><span>{ownerLabel(candidate)}</span><bdi>{candidate.user_id}</bdi></button>)}</div>}
+                <div className="se-owner-selected"><span className="se-owner-avatar"><User size={23} /></span><div><strong>{ownerUserId === null ? "مالک تعیین نشده" : "حساب مالک انتخاب شده"}</strong><p>{ownerUserId === null ? "این کسب‌وکار می‌تواند بدون مالک ثبت شود." : "شناسهٔ کاربر: " + ownerUserId}</p></div>{ownerUserId !== null && <button type="button" className="se-button se-button--quiet" onClick={() => setOwnerUserId(null)}><X size={15} />حذف</button>}</div>
+                <div className="se-switch-row"><div><strong>اجازهٔ نمایش فرد مرتبط</strong><p>نمایش عمومی فقط با اجازهٔ خود فرد برای این کسب‌وکار و عمومی بودن پروفایل او انجام می‌شود.</p></div><Switch checked={showOwner} onCheckedChange={setShowOwner} aria-label="اجازه نمایش عمومی فرد مرتبط" /></div>
+              </Section>
+              <Section title="منبع ثبت اطلاعات" description="اختیاری؛ برای شناسایی رکوردهای واردشده از یک منبع دیگر."><div className="se-form-grid"><FieldLabel hint="منبع و شناسهٔ خارجی باید با هم تکمیل شوند.">منبع<Input dir="ltr" value={source} onChange={(event) => setSource(event.target.value)} placeholder="مثلاً atlas" /></FieldLabel><FieldLabel>شناسه در منبع<Input dir="ltr" value={externalId} onChange={(event) => setExternalId(event.target.value)} placeholder="شناسهٔ پایدار و یکتا" /></FieldLabel></div></Section>
+            </>}
+          </div></fieldset>
         </div>
-      </main>
-    </div>
-  );
+
+        <aside className="se-sidebar" aria-label="انتشار و ذخیرهٔ کسب‌وکار"><section className="se-save-card"><header><span className="se-save-icon"><Store size={23} /></span><div><h2>انتشار و ذخیره</h2><p>{isNew ? "کسب‌وکار جدید" : "رکورد " + numericId}</p></div></header><label className="se-field">وضعیت انتشار<select value={status} onChange={(event) => setStatus(event.target.value as ServiceStatus)} disabled={isSaving}>{SERVICE_STATUSES.map((option) => <option key={option} value={option}>{STATUS_LABELS[option]}</option>)}</select></label><p className="se-status-hint">{STATUS_HINTS[status]}</p>
+          <div className="se-summary-checks"><div className={name.trim() ? "is-complete" : ""}>{name.trim() ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}<span>نام کسب‌وکار</span></div><div className={mainCategory ? "is-complete" : ""}>{mainCategory ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}<span>{mainCategory ? "دستهٔ اصلی: " + mainCategory : "دستهٔ اصلی تعیین نشده"}</span></div><div><Phone size={16} /><span>{contacts.filter((contact) => contact.is_visible).length.toLocaleString("fa-IR")} راه ارتباط عمومی</span></div><div><Tags size={16} /><span>{assessments.filter((value) => value !== "unknown").length.toLocaleString("fa-IR")} از ۴ ویژگی بررسی شده</span></div></div>
+          {(pendingImage || removeImageRequested) && <p className="se-pending-note">{removeImageRequested ? "تصویر فعلی پس از ذخیره حذف می‌شود." : "تصویر جدید آمادهٔ بارگذاری است."}</p>}
+          {localIssue && <p className="se-validation-note" role="status"><AlertCircle size={16} />{localIssue}</p>}
+          <button type="button" className="se-button se-button--save" onClick={handleSave} disabled={isSaving || isStale}>{isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}{isSaving ? "در حال ذخیره…" : isNew ? "ایجاد کسب‌وکار" : "ذخیرهٔ تغییرات"}</button>
+          <button type="button" className="se-button se-button--cancel" disabled={isSaving} onClick={() => navigate("/services")}>بازگشت به فهرست</button>
+          {loadedUpdatedAt && <p className="se-last-update">آخرین ذخیره<br />{formatDateTime(loadedUpdatedAt)}</p>}
+        </section></aside>
+      </div>
+      <div className="se-mobile-save"><span>{STATUS_LABELS[status]}</span><button type="button" className="se-button se-button--save" onClick={handleSave} disabled={isSaving || isStale}>{isSaving ? <Loader2 size={17} className="animate-spin" /> : <Save size={17} />}{isSaving ? "در حال ذخیره…" : "ذخیرهٔ تغییرات"}</button></div>
+    </main>
+  </div>;
 };
 
 export default ServiceEditor;

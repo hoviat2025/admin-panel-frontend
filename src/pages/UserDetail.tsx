@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { User, getProfileImageUrl } from "@/types/user";
 import { API_BASE_URL } from "@/config";
 import { Badge } from "@/components/ui/badge";
-import { dateTimeLocalToUnixSeconds, formatDateTime, formatUnixDateTime, getMembershipKind, getSyncStatus, parseMaybeJson, unixSecondsToDateTimeLocal } from "@/lib/userDisplay";
+import { dateTimeLocalToUnixSeconds, formatDateTime, formatUnixDateTime, getMembershipKind, getUserDisplayName, getSyncStatus, parseMaybeJson, unixSecondsToDateTimeLocal } from "@/lib/userDisplay";
 
 type EditableUserKey =
   | "counter" | "accounting_code" | "username" | "first_name" | "last_name" | "nickname"
@@ -41,9 +41,9 @@ type EditField = {
 const profileFields: EditField[] = [
   { key: "counter", label: "شماره کاربر یوروبات", type: "number", dir: "ltr" },
   { key: "accounting_code", label: "کد حسابداری", dir: "ltr" },
-  { key: "first_name", label: "نام" },
-  { key: "last_name", label: "نام خانوادگی" },
-  { key: "nickname", label: "نام مستعار" },
+  { key: "nickname", label: "نام عمومی", hint: "نامی که در پروفایل عمومی و بخش فرد مرتبط با کسب‌وکار نمایش داده می‌شود." },
+  { key: "first_name", label: "نام (اطلاعات قدیمی)", hint: "برای سوابق مدیریتی؛ نام عمومی را در فیلد بالا ویرایش کنید." },
+  { key: "last_name", label: "نام خانوادگی (اطلاعات قدیمی)" },
   { key: "username", label: "نام کاربری تلگرام", dir: "ltr", hint: "بدون علامت @" },
   { key: "phone_number", label: "شماره تلفن", dir: "ltr" },
   { key: "whatsapp_number", label: "شماره واتساپ", dir: "ltr" },
@@ -220,8 +220,10 @@ const UserDetail = () => {
       const payload: Record<string, string | number | boolean | null> = {
         user_id: user.user_id,
       };
+      // Unrelated edits must not overwrite a newer public name or other fields.
+      const original = createEditData(user);
       Object.entries(editData).forEach(([key, value]) => {
-        if (readOnlyEditKeys.has(key as EditableUserKey)) return;
+        if (readOnlyEditKeys.has(key as EditableUserKey) || value === original[key as EditableUserKey]) return;
         if (typeof value === "boolean") {
           payload[key] = value;
         } else if (numericEditKeys.has(key as EditableUserKey)) {
@@ -236,6 +238,12 @@ const UserDetail = () => {
           payload[key] = value;
         }
       });
+
+      if (Object.keys(payload).length === 1) {
+        setIsEditOpen(false);
+        toast({ title: "تغییری برای ذخیره وجود ندارد" });
+        return;
+      }
 
       const response = await fetch(`${API_BASE_URL}/admin/users-management/update`, {
         method: "PATCH",
@@ -342,14 +350,14 @@ const UserDetail = () => {
             )}
             <img
               src={getProfileImageUrl(user.profile_path)}
-              alt={user.first_name}
+              alt={getUserDisplayName(user)}
               className="w-28 h-28 rounded-full object-cover border-4 border-silver-light mb-4"
               onError={(e) => {
-                e.currentTarget.src = `https://ui-avatars.com/api/?name=${user.first_name || 'User'}+${user.last_name || ''}&background=e5e5e5&color=333&size=128`;
+                e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(getUserDisplayName(user))}&background=e5e5e5&color=333&size=128`;
               }}
             />
             <h1 className="text-2xl font-bold text-charcoal">
-              {user.first_name} {user.last_name}
+              {getUserDisplayName(user)}
             </h1>
             <p className="text-silver mt-1">@{user.username || '---'}</p>
             <div className="flex items-center gap-2 mt-2 text-silver text-sm">
@@ -363,7 +371,9 @@ const UserDetail = () => {
           <GlassBox className="mb-6">
             <h2 className="font-bold text-charcoal mb-4">اطلاعات اصلی</h2>
             <InfoRow icon={Hash} label="شناسه کاربر" value={user.user_id} />
-            <InfoRow icon={UserIcon} label="نام مستعار" value={user.nickname} />
+            <InfoRow icon={UserIcon} label="نام عمومی" value={user.nickname} />
+            <InfoRow label="نام (اطلاعات قدیمی)" value={user.first_name} />
+            <InfoRow label="نام خانوادگی (اطلاعات قدیمی)" value={user.last_name} />
             <InfoRow icon={AtSign} label="نام کاربری" value={user.username} />
             <InfoRow icon={Phone} label="شماره تلفن" value={user.phone_number} />
             <InfoRow icon={Phone} label="واتساپ" value={user.whatsapp_number} />

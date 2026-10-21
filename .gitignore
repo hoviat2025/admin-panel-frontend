@@ -16,6 +16,9 @@ dist-ssr
 
 # Environment Variables (Safety first)
 .env
+.env.*
+!.env.example
+!.env.sample
 *.local
 
 # Editor directories and files

@@ -1,0 +1,6 @@
+.admin-glass-dialog{width:min(560px,calc(100vw - 30px));max-height:calc(100dvh - 36px);margin:auto;padding:0;border:1px solid #fff;border-radius:25px;background:hsl(var(--card));color:hsl(var(--charcoal));box-shadow:0 24px 100px #17243245;direction:rtl;overflow:auto;overscroll-behavior:contain}
+.admin-glass-dialog::backdrop{background:#17243269;backdrop-filter:blur(8px)}
+.admin-glass-dialog__header{display:flex;align-items:center;justify-content:space-between;gap:15px;position:sticky;top:0;z-index:2;background:hsl(var(--card));padding:22px 25px 17px;border-bottom:1px solid hsl(var(--border)/.6)}
+.admin-glass-dialog__header h2{font-size:18px;line-height:1.9;font-weight:750}.admin-glass-dialog__header button{display:grid;place-items:center;flex-shrink:0;width:34px;height:34px;background:hsl(var(--secondary));border-radius:11px;color:hsl(var(--silver))}.admin-glass-dialog__body{padding:23px 25px}
+.admin-glass-dialog :focus-visible{outline:3px solid hsl(var(--gold)/.65);outline-offset:3px}
+@media(max-width:520px){.admin-glass-dialog__body{padding:19px}.admin-glass-dialog__header{padding:18px 19px 14px}}
