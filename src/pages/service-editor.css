@@ -213,3 +213,22 @@
 .se-add-city > div { display:flex; flex-wrap:wrap; align-items:center; gap:9px; margin-top:12px; }
 .se-add-city input { flex:1; min-width:170px; }
 .se-add-city p { font-size:.68rem; margin-top:9px; color:#8a7e6b; }
+.se-coordinate-help { display:grid; gap:6px; margin-top:14px; font-size:.7rem; line-height:1.9; color:var(--se-muted); }
+.se-coordinate-help a { color:var(--se-accent); text-decoration:underline; text-underline-offset:3px; }
+.se-category > label > span, .se-category-group__heading strong, .se-summary-checks span, .se-owner-results button > span { min-width:0; overflow-wrap:anywhere; }
+.se-category-group__heading > span:first-child { min-width:0; }
+.se-category-group__heading svg, .se-category-group__heading > span:last-child, .se-primary-category { flex-shrink:0; }
+.se-category-group__heading strong { flex:1; }
+.se-category-group__heading small { flex-basis:100%; }
+.se-owner-search > input { min-width:0; }
+.se-owner-search > button { flex-shrink:0; }
+.se-primary-category { border:1px solid var(--se-accent-line); min-height:36px; }
+@media(max-width:540px) {
+  .se-field input:not([type=checkbox]):not([type=radio]), .se-field textarea, .se-field select, .se-section__body > input, .se-owner-search > input { font-size:16px; }
+  .se-add-city input { min-width:0; flex-basis:100%; }
+  .se-add-city .se-button { width:100%; }
+  .se-primary-category { min-height:44px; }
+  .se-category > label { min-height:44px; }
+  .se-category-group__heading { gap:8px; }
+  .se-contact__tools button { width:36px; height:40px; }
+}

@@ -20,3 +20,7 @@
 @media(prefers-reduced-motion:reduce){.business-record{transition:none}}
 .business-record { color:inherit; text-decoration:none; cursor:pointer; }
 .business-record:focus-visible { outline:3px solid hsl(var(--gold) / .65); outline-offset:4px; }
+.business-record__classification, .business-record__footer > span, .business-record__location bdi { min-width:0; overflow-wrap:anywhere; }
+.business-filter-chips button > span { min-width:0; overflow-wrap:anywhere; }
+.business-filter-chips button > svg, .business-list-search > svg { flex-shrink:0; }
+@media(max-width:540px) { .business-list-search input { font-size:16px; } .business-status-tabs button, .business-filter-button, .business-refresh { min-height:44px; } }

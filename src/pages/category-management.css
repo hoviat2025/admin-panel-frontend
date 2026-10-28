@@ -177,3 +177,15 @@
 .category-parent-options label:has(input:checked) { background:hsl(var(--gold) / .08); }
 .category-parent-options small { display:block; color:#a9aab0; font-size:9px; }
 @media(max-width:540px) { .category-row-meta { gap:6px; flex-wrap:wrap; max-width:116px; } .category-shared { font-size:8px; padding:3px 5px; } .category-editor .category-parent-options { grid-template-columns:minmax(0,1fr); } }
+.category-details h3, .category-details__slug, .category-details__path p, .category-details__description, .category-parent-options label > span { overflow-wrap:anywhere; min-width:0; }
+.category-editor__header > div { min-width:0; }
+@media(max-width:540px) {
+  .category-toolbar__bottom { flex-wrap:wrap; gap:10px; }
+  .category-search input { font-size:16px; }
+  .category-row-select { flex-wrap:wrap; }
+  .category-row-copy { flex:1; }
+  .category-row-meta { flex-basis:100%; max-width:none; padding-inline-start:39px; }
+  .category-row-edit { min-height:44px; flex-basis:36px; width:36px; }
+  .category-filters button, .category-collapse { min-height:44px; }
+  .category-editor__header > button { flex-shrink:0; }
+}

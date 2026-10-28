@@ -154,10 +154,10 @@ const ServiceEditor = () => {
   const [persianLanguage, setPersianLanguage] = useState<RelevanceAnswerChoice>("unknown");
   const [persianService, setPersianService] = useState<RelevanceAnswerChoice>("unknown");
 
-  const [status, setStatus] = useState<ServiceStatus>("draft");
+  const [status, setStatus] = useState<ServiceStatus>("published");
 
   const [ownerUserId, setOwnerUserId] = useState<number | null>(null);
-  const [showOwner, setShowOwner] = useState(false);
+  const [showOwner, setShowOwner] = useState(true);
   const [ownerSearch, setOwnerSearch] = useState("");
   const [ownerResults, setOwnerResults] = useState<OwnerCandidate[]>([]);
   const [isSearchingOwner, setIsSearchingOwner] = useState(false);
@@ -301,17 +301,28 @@ const ServiceEditor = () => {
 
   const toggleCategory = (categoryId: number) => {
     if (!assignableCategoryIds.has(categoryId)) return;
-    setSelectedCategoryIds((previous) => {
-      if (previous.includes(categoryId)) {
-        if (primaryCategoryId === categoryId) setPrimaryCategoryId(null);
-        return previous.filter((id) => id !== categoryId);
-      }
-      return [...previous, categoryId];
-    });
+    if (selectedCategoryIds.includes(categoryId)) {
+      removeCategory(categoryId);
+      return;
+    }
+    if (!categories.find((category) => category.id === categoryId)?.is_active) return;
+    setSelectedCategoryIds([...selectedCategoryIds, categoryId]);
+    if (primaryCategoryId === null || !assignableCategoryIds.has(primaryCategoryId)) {
+      setPrimaryCategoryId(categoryId);
+    }
+  };
+
+  const removeCategory = (categoryId: number) => {
+    const remaining = selectedCategoryIds.filter((id) => id !== categoryId);
+    setSelectedCategoryIds(remaining);
+    if (primaryCategoryId === categoryId) {
+      setPrimaryCategoryId(remaining.find((id) => assignableCategoryIds.has(id) && categories.find((category) => category.id === id)?.is_active) ?? null);
+    }
   };
 
   const choosePrimary = (categoryId: number) => {
     if (!assignableCategoryIds.has(categoryId)) return;
+    if (categoryId !== primaryCategoryId && !categories.find((category) => category.id === categoryId)?.is_active) return;
     setSelectedCategoryIds((previous) =>
       previous.includes(categoryId) ? previous : [...previous, categoryId],
     );
@@ -547,12 +558,12 @@ const ServiceEditor = () => {
                 </div>
                 {locationError && <p className="se-small-note" role="alert">{locationError} <button type="button" onClick={loadLocations}>تلاش دوباره</button></p>}
                 {selectedLocationState && <details className="se-add-city"><summary>شهر موردنظر در فهرست نیست؟</summary><p>نام رسمی شهر در {selectedLocationState.state} را وارد کنید. این شهر به فهرست مشترک همهٔ کسب‌وکارها اضافه می‌شود.</p><div><Input dir="auto" aria-label="نام رسمی شهر جدید" value={newCity} onChange={(event) => setNewCity(event.target.value)} placeholder="نام رسمی شهر" /><button type="button" className="se-button se-button--outline" disabled={!newCity.trim() || isAddingCity} onClick={addCity}>{isAddingCity ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}افزودن شهر</button></div></details>}
-                <details className="se-details" open={Boolean(latitude || longitude)}><summary>مختصات جغرافیایی <span>اختیاری</span></summary><div className="se-form-grid"><FieldLabel hint="بین ۹۰- و ۹۰؛ همراه با طول جغرافیایی.">عرض جغرافیایی<Input dir="ltr" type="number" step="any" min={-90} max={90} value={latitude} onChange={(event) => setLatitude(event.target.value)} placeholder="50.1109" /></FieldLabel><FieldLabel hint="بین ۱۸۰- و ۱۸۰؛ همراه با عرض جغرافیایی.">طول جغرافیایی<Input dir="ltr" type="number" step="any" min={-180} max={180} value={longitude} onChange={(event) => setLongitude(event.target.value)} placeholder="8.6821" /></FieldLabel></div></details>
+                <details className="se-details" open={Boolean(latitude || longitude)}><summary>مختصات جغرافیایی <span>اختیاری</span></summary><p className="se-coordinate-help"><a href={"https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent([address, city, state, countryCode].filter(Boolean).join(", ") || "Germany")} target="_blank" rel="noopener noreferrer">یافتن موقعیت در Google Maps ↗</a><span>روی محل راست‌کلیک کنید؛ عدد اول عرض و عدد دوم طول جغرافیایی است.</span></p><div className="se-form-grid"><FieldLabel hint="بین ۹۰- و ۹۰؛ همراه با طول جغرافیایی.">عرض جغرافیایی<Input dir="ltr" type="number" step="any" min={-90} max={90} value={latitude} onChange={(event) => setLatitude(event.target.value)} placeholder="50.1109" /></FieldLabel><FieldLabel hint="بین ۱۸۰- و ۱۸۰؛ همراه با عرض جغرافیایی.">طول جغرافیایی<Input dir="ltr" type="number" step="any" min={-180} max={180} value={longitude} onChange={(event) => setLongitude(event.target.value)} placeholder="8.6821" /></FieldLabel></div></details>
               </Section>
             </>}
 
             {activeTab === "classification" && <>
-              <Section title="دسته‌بندی خدمات" description="ابتدا گروه را باز کنید، سپس دسته‌های مرتبط را انتخاب کنید. یک دستهٔ سطح دوم را اصلی قرار دهید.">
+              <Section title="دسته‌بندی خدمات" description="ابتدا گروه را باز کنید، سپس دسته‌های مرتبط را انتخاب کنید. اولین دستهٔ انتخاب‌شده، اصلی می‌شود؛ می‌توانید آن را تغییر دهید.">
                 <Input value={categorySearch} onChange={(event) => setCategorySearch(event.target.value)} type="search" placeholder="جستجو در دسته‌بندی‌ها…" aria-label="جستجوی دسته‌بندی" />
                 {categoryGroups.length === 0 ? <div className="se-empty"><Tags size={25} /><p>هنوز دسته‌بندی‌ای در دسترس نیست.</p></div> : <div className="se-category-groups">
                   {categoryGroups.map(({ group, children }) => {
@@ -570,12 +581,12 @@ const ServiceEditor = () => {
                         const selected = selectedCategoryIds.includes(category.id);
                         const isPrimary = primaryCategoryId === category.id;
                         const retired = !category.is_active;
-                        return <div key={category.id} className={`se-category ${selected ? "is-selected" : ""} ${retired ? "is-retired" : ""}`}><label><input type="checkbox" checked={selected} disabled={retired && !selected} onChange={() => toggleCategory(category.id)} /><span>{category.name}{retired && <small>غیرفعال</small>}</span></label><button type="button" onClick={() => choosePrimary(category.id)} disabled={retired && !isPrimary} className={isPrimary ? "se-primary-category is-active" : "se-primary-category"}>{isPrimary && <Check size={13} />}{isPrimary ? "دستهٔ اصلی" : "انتخاب اصلی"}</button></div>;
+                        return <div key={category.id} className={`se-category ${selected ? "is-selected" : ""} ${retired ? "is-retired" : ""}`}><label><input type="checkbox" checked={selected} disabled={retired && !selected} onChange={() => toggleCategory(category.id)} /><span>{category.name}{retired && <small>غیرفعال</small>}</span></label><button type="button" onClick={() => choosePrimary(category.id)} disabled={retired && !isPrimary} aria-pressed={isPrimary} aria-label={`انتخاب ${category.name} به‌عنوان دستهٔ اصلی`} className={isPrimary ? "se-primary-category is-active" : "se-primary-category"}>{isPrimary && <Check size={13} />}{isPrimary ? "دستهٔ اصلی" : "انتخاب اصلی"}</button></div>;
                       })}{!visible.length && <p className="se-small-note">این گروه هنوز دسته‌ای ندارد.</p>}</div>}
                     </section>;
                   })}
                 </div>}
-                {selectedCategoryIds.some((id) => !assignableCategoryIds.has(id)) && <div className="se-legacy-categories"><p>گروه‌های قدیمی را حذف و یک دستهٔ سطح دوم انتخاب کنید:</p>{selectedCategoryIds.filter((id) => !assignableCategoryIds.has(id)).map((id) => <button type="button" key={id} onClick={() => { setSelectedCategoryIds((current) => current.filter((value) => value !== id)); if (primaryCategoryId === id) setPrimaryCategoryId(null); }}>{categories.find((category) => category.id === id)?.name ?? id}<X size={14} /></button>)}</div>}
+                {selectedCategoryIds.some((id) => !assignableCategoryIds.has(id)) && <div className="se-legacy-categories"><p>گروه‌های قدیمی را حذف و یک دستهٔ سطح دوم انتخاب کنید:</p>{selectedCategoryIds.filter((id) => !assignableCategoryIds.has(id)).map((id) => <button type="button" key={id} onClick={() => removeCategory(id)}>{categories.find((category) => category.id === id)?.name ?? id}<X size={14} /></button>)}</div>}
                 <p className="se-small-note">{selectedCategoryIds.length.toLocaleString("fa-IR")} دسته انتخاب شده · اصلی: {mainCategory ?? "تعیین نشده"}</p>
               </Section>
               <Section title="ویژگی‌های ایرانی و فارسی" description="این چهار ویژگی مستقل‌اند. اگر اطلاعات کافی ندارید «نامشخص» را نگه دارید.">
