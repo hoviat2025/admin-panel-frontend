@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "@/config";
+import { authenticatedFetch } from "@/lib/authSession";
 import { AuditListResponse, AuditLog } from "@/types/audit";
 
 export type AuditFilters = {
@@ -45,14 +46,14 @@ export async function fetchAuditLogs(
       params.set(key, value);
     }
   });
-  const response = await fetch(`${API_BASE_URL}/admin/audit-logs/?${params}`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/admin/audit-logs/?${params}`, {
     headers: authHeaders(),
   });
   return unwrap<AuditListResponse>(response);
 }
 
 export async function fetchAuditLog(id: number): Promise<AuditLog> {
-  const response = await fetch(`${API_BASE_URL}/admin/audit-logs/${id}`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/admin/audit-logs/${id}`, {
     headers: authHeaders(),
   });
   const body = await unwrap<{ data: AuditLog }>(response);

@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "@/config";
+import { authenticatedFetch } from "@/lib/authSession";
 
 export interface StatisticsResponse {
   businesses: {
@@ -38,7 +39,7 @@ interface StandardResponse<T> {
 }
 
 export async function fetchStatistics(token: string): Promise<StatisticsResponse> {
-  const response = await fetch(`${API_BASE_URL}/admin/statistics/`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/admin/statistics/`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
   });

@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { User, getProfileImageUrl } from "@/types/user";
 import { API_BASE_URL } from "@/config";
+import { authenticatedFetch } from "@/lib/authSession";
 import { Badge } from "@/components/ui/badge";
 import { dateTimeLocalToUnixSeconds, formatDateTime, formatUnixDateTime, getMembershipKind, getUserDisplayName, getSyncStatus, parseMaybeJson, unixSecondsToDateTimeLocal } from "@/lib/userDisplay";
 
@@ -175,7 +176,7 @@ const UserDetail = () => {
 
   const fetchUser = async () => {
     try {
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `${API_BASE_URL}/admin/users-management/${userId}`,
         {
           method: "GET",
@@ -186,6 +187,7 @@ const UserDetail = () => {
         }
       );
 
+      if (response.status === 401) return;
       const json = await response.json();
 
       if (response.ok && json.data) {
@@ -245,7 +247,7 @@ const UserDetail = () => {
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/admin/users-management/update`, {
+      const response = await authenticatedFetch(`${API_BASE_URL}/admin/users-management/update`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -254,6 +256,7 @@ const UserDetail = () => {
         body: JSON.stringify(payload)
       });
 
+      if (response.status === 401) return;
       const json = await response.json();
 
       if (response.ok && json.data) {

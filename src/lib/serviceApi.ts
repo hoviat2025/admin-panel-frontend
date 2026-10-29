@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "@/config";
+import { authenticatedFetch } from "@/lib/authSession";
 import {
   Category,
   CategoryCreatePayload,
@@ -83,7 +84,7 @@ async function unwrap<T>(response: Response): Promise<Envelope<T>> {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<Envelope<T>> {
-  const response = await fetch(`${BASE}${path}`, {
+  const response = await authenticatedFetch(`${BASE}${path}`, {
     ...init,
     headers: { ...authHeaders(), ...(init?.headers ?? {}) },
   });
@@ -164,7 +165,7 @@ export async function uploadServiceCoverImage(id: number, file: File, expectedUp
   form.append("expected_updated_at", expectedUpdatedAt);
   const headers = new Headers(authHeaders());
   headers.delete("Content-Type");
-  const response = await fetch(`${BASE}/services/${id}/cover-image`, { method: "POST", headers, body: form });
+  const response = await authenticatedFetch(`${BASE}/services/${id}/cover-image`, { method: "POST", headers, body: form });
   return (await unwrap<Service>(response)).data;
 }
 
@@ -255,7 +256,7 @@ export async function updateCategory(id: number, payload: CategoryUpdatePayload)
 export async function searchOwnerCandidates(term: string, size = 10): Promise<OwnerCandidate[]> {
   const params = new URLSearchParams({ page: "1", size: String(size) });
   if (term.trim()) params.set("search", term.trim());
-  const response = await fetch(`${API_BASE_URL}/admin/users-management/?${params.toString()}`, {
+  const response = await authenticatedFetch(`${API_BASE_URL}/admin/users-management/?${params.toString()}`, {
     headers: authHeaders(),
   });
   const body = await unwrap<OwnerCandidate[]>(response);

@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "@/config";
+import { authenticatedFetch } from "@/lib/authSession";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
@@ -189,7 +190,7 @@ const UserManagement = () => {
       });
 
       // 3. Call API
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `${API_BASE_URL}/admin/users-management/?${params.toString()}`,
         {
           method: "GET",
@@ -200,6 +201,7 @@ const UserManagement = () => {
         }
       );
 
+      if (response.status === 401) return;
       if (response.ok) {
         const result = await response.json();
         // The API returns { data: [...], meta: { ... } }
