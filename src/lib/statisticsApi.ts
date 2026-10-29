@@ -1,6 +1,11 @@
 import { API_BASE_URL } from "@/config";
 
 export interface StatisticsResponse {
+  businesses: {
+    total_businesses: number;
+    published_businesses: number;
+    without_photo: number;
+  };
   overview: {
     total_users: number;
     eurobot_members: number;
@@ -35,6 +40,7 @@ interface StandardResponse<T> {
 export async function fetchStatistics(token: string): Promise<StatisticsResponse> {
   const response = await fetch(`${API_BASE_URL}/admin/statistics/`, {
     headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
   });
 
   const payload = (await response.json()) as StandardResponse<StatisticsResponse>;

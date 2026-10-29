@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { AlertCircle, BarChart3, RefreshCw } from "lucide-react";
+import { AlertCircle, BarChart3, RefreshCw, Store } from "lucide-react";
 import { Header } from "@/components/Header";
 import { GlassBox } from "@/components/GlassBox";
 import { Button } from "@/components/ui/button";
@@ -66,10 +66,10 @@ const Statistics = () => {
     <div className="min-h-screen">
       <Header />
       <main className="container mx-auto max-w-5xl px-4 py-8">
-        <div className="mb-6 flex items-center justify-between gap-4">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <div className="text-right">
             <h2 className="text-xl font-bold text-charcoal">آمار و ارقام</h2>
-            <p className="mt-1 text-sm text-silver">آمار اعضا و عضویت‌های جدید</p>
+            <p className="mt-1 text-sm text-silver">آمار کاربران، عضویت‌های جدید و کسب‌وکارها</p>
           </div>
           <Button variant="outline" onClick={() => void load()} disabled={loading}>
             <RefreshCw className={`ml-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
@@ -91,6 +91,20 @@ const Statistics = () => {
           <GlassBox className="py-16 text-center text-silver">در حال دریافت آمار...</GlassBox>
         ) : statistics ? (
           <div className="space-y-5">
+            {statistics.businesses && (
+              <GlassBox className="text-right">
+                <div className="mb-4 flex items-center gap-2">
+                  <Store className="h-5 w-5 text-charcoal" />
+                  <h3 className="text-lg font-bold text-charcoal">کسب‌وکارها</h3>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <Stat label="کل کسب‌وکارها" value={statistics.businesses.total_businesses} />
+                  <Stat label="منتشرشده" value={statistics.businesses.published_businesses} />
+                  <Stat label="بدون عکس" value={statistics.businesses.without_photo} />
+                </div>
+              </GlassBox>
+            )}
+
             <GlassBox className="text-right">
               <div className="mb-4 flex items-center gap-2">
                 <BarChart3 className="h-5 w-5 text-charcoal" />
