@@ -1,0 +1,1179 @@
+{
+  "schema_version": "1.0",
+  "parents": [
+    {
+      "key": "food-and-dining",
+      "name": "غذا و خوراکی"
+    },
+    {
+      "key": "beauty",
+      "name": "خدمات زیبایی"
+    },
+    {
+      "key": "legal-real-estate",
+      "name": "امور حقوقی و املاک"
+    },
+    {
+      "key": "services",
+      "name": "خدمات فنی و تعمیرات"
+    },
+    {
+      "key": "education",
+      "name": "آموزش"
+    },
+    {
+      "key": "shops",
+      "name": "فروشگاه"
+    },
+    {
+      "key": "auto-transport",
+      "name": "خدمات خودرو و حمل و نقل"
+    },
+    {
+      "key": "sports-entertainment",
+      "name": "ورزش و سرگرمی"
+    },
+    {
+      "key": "health",
+      "name": "خدمات پزشکی و سلامت"
+    },
+    {
+      "key": "digital-and-technology-services",
+      "name": "خدمات دیجیتال و فناوری"
+    },
+    {
+      "key": "construction-and-building",
+      "name": "ساختمان و ساخت‌وساز"
+    }
+  ],
+  "categories": [
+    {
+      "key": "ash-halim",
+      "name": "آش خانه و حلیم پزی",
+      "primary_parent_key": "food-and-dining",
+      "parent_keys": [
+        "food-and-dining"
+      ]
+    },
+    {
+      "key": "catering",
+      "name": "کترینگ",
+      "primary_parent_key": "food-and-dining",
+      "parent_keys": [
+        "food-and-dining"
+      ]
+    },
+    {
+      "key": "persian-kebab-jigaraki",
+      "name": "کبابی",
+      "primary_parent_key": "food-and-dining",
+      "parent_keys": [
+        "food-and-dining"
+      ]
+    },
+    {
+      "key": "persian-restaurant",
+      "name": "رستوران",
+      "primary_parent_key": "food-and-dining",
+      "parent_keys": [
+        "food-and-dining"
+      ]
+    },
+    {
+      "key": "food-and-dining-persian-supermarket",
+      "name": "سوپر مارکت",
+      "primary_parent_key": "food-and-dining",
+      "parent_keys": [
+        "food-and-dining"
+      ]
+    },
+    {
+      "key": "confectionery-bakery",
+      "name": "قنادی",
+      "primary_parent_key": "food-and-dining",
+      "parent_keys": [
+        "food-and-dining"
+      ]
+    },
+    {
+      "key": "fast-food",
+      "name": "فست فود",
+      "primary_parent_key": "food-and-dining",
+      "parent_keys": [
+        "food-and-dining"
+      ]
+    },
+    {
+      "key": "traditional-bakery",
+      "name": "نانوایی",
+      "primary_parent_key": "food-and-dining",
+      "parent_keys": [
+        "food-and-dining"
+      ]
+    },
+    {
+      "key": "cafe-coffee-shop",
+      "name": "کافی شاپ",
+      "primary_parent_key": "food-and-dining",
+      "parent_keys": [
+        "food-and-dining"
+      ]
+    },
+    {
+      "key": "dizi-kalehpacheh",
+      "name": "دیزی‌سرا و کله‌پزی",
+      "primary_parent_key": "food-and-dining",
+      "parent_keys": [
+        "food-and-dining"
+      ]
+    },
+    {
+      "key": "hair-salon",
+      "name": "پیرایشگاه",
+      "primary_parent_key": "beauty",
+      "parent_keys": [
+        "beauty"
+      ]
+    },
+    {
+      "key": "waxing",
+      "name": "اپیلاسیون",
+      "primary_parent_key": "beauty",
+      "parent_keys": [
+        "beauty"
+      ]
+    },
+    {
+      "key": "hair-extensions",
+      "name": "اکستنشن",
+      "primary_parent_key": "beauty",
+      "parent_keys": [
+        "beauty"
+      ]
+    },
+    {
+      "key": "tattoo-microblading",
+      "name": "تتو و میکروبلیدینگ",
+      "primary_parent_key": "beauty",
+      "parent_keys": [
+        "beauty"
+      ]
+    },
+    {
+      "key": "eyelash-eyebrow",
+      "name": "مژه و ابرو",
+      "primary_parent_key": "beauty",
+      "parent_keys": [
+        "beauty"
+      ]
+    },
+    {
+      "key": "hair-coloring",
+      "name": "رنگ و مش",
+      "primary_parent_key": "beauty",
+      "parent_keys": [
+        "beauty"
+      ]
+    },
+    {
+      "key": "beauty-salon",
+      "name": "سالن زیبایی",
+      "primary_parent_key": "beauty",
+      "parent_keys": [
+        "beauty"
+      ]
+    },
+    {
+      "key": "facial-skin-care",
+      "name": "فیشال",
+      "primary_parent_key": "beauty",
+      "parent_keys": [
+        "beauty"
+      ]
+    },
+    {
+      "key": "laser-hair-removal",
+      "name": "لیزر موهای زائد",
+      "primary_parent_key": "beauty",
+      "parent_keys": [
+        "beauty"
+      ]
+    },
+    {
+      "key": "massage",
+      "name": "ماساژ",
+      "primary_parent_key": "beauty",
+      "parent_keys": [
+        "beauty"
+      ]
+    },
+    {
+      "key": "kids-haircut",
+      "name": "پیرایش کودک",
+      "primary_parent_key": "beauty",
+      "parent_keys": [
+        "beauty"
+      ]
+    },
+    {
+      "key": "nail-salon",
+      "name": "کاشت ناخن",
+      "primary_parent_key": "beauty",
+      "parent_keys": [
+        "beauty"
+      ]
+    },
+    {
+      "key": "hair-keratin-rebonding",
+      "name": "کراتینه",
+      "primary_parent_key": "beauty",
+      "parent_keys": [
+        "beauty"
+      ]
+    },
+    {
+      "key": "marriage-registration",
+      "name": "ثبت ازدواج",
+      "primary_parent_key": "legal-real-estate",
+      "parent_keys": [
+        "legal-real-estate"
+      ]
+    },
+    {
+      "key": "business-consulting",
+      "name": "ثبت شرکت و بیزینس",
+      "primary_parent_key": "legal-real-estate",
+      "parent_keys": [
+        "legal-real-estate"
+      ]
+    },
+    {
+      "key": "certified-translation",
+      "name": "ترجمه رسمی",
+      "primary_parent_key": "legal-real-estate",
+      "parent_keys": [
+        "legal-real-estate"
+      ]
+    },
+    {
+      "key": "immigration-service",
+      "name": "امور مهاجرت",
+      "primary_parent_key": "legal-real-estate",
+      "parent_keys": [
+        "legal-real-estate"
+      ]
+    },
+    {
+      "key": "notary-public",
+      "name": "دفتر اسناد رسمی",
+      "primary_parent_key": "legal-real-estate",
+      "parent_keys": [
+        "legal-real-estate"
+      ]
+    },
+    {
+      "key": "exchange",
+      "name": "صرافی",
+      "primary_parent_key": "legal-real-estate",
+      "parent_keys": [
+        "legal-real-estate"
+      ]
+    },
+    {
+      "key": "real-estate-agent",
+      "name": "مشاوره املاک",
+      "primary_parent_key": "legal-real-estate",
+      "parent_keys": [
+        "legal-real-estate"
+      ]
+    },
+    {
+      "key": "financial-advisor",
+      "name": "مشاوره مالی برای مهاجران",
+      "primary_parent_key": "legal-real-estate",
+      "parent_keys": [
+        "legal-real-estate"
+      ]
+    },
+    {
+      "key": "accounting-tax",
+      "name": "موسسه حسابداری و مالیاتی",
+      "primary_parent_key": "legal-real-estate",
+      "parent_keys": [
+        "legal-real-estate"
+      ]
+    },
+    {
+      "key": "attorney",
+      "name": "وکیل",
+      "primary_parent_key": "legal-real-estate",
+      "parent_keys": [
+        "legal-real-estate"
+      ]
+    },
+    {
+      "key": "brokerage",
+      "name": "کارگزاری",
+      "primary_parent_key": "legal-real-estate",
+      "parent_keys": [
+        "legal-real-estate"
+      ]
+    },
+    {
+      "key": "services-electrician",
+      "name": "برقکار",
+      "primary_parent_key": "services",
+      "parent_keys": [
+        "services"
+      ]
+    },
+    {
+      "key": "appliance-repair",
+      "name": "تعمیر لوازم خانگی",
+      "primary_parent_key": "services",
+      "parent_keys": [
+        "services"
+      ]
+    },
+    {
+      "key": "washing-machine-repair",
+      "name": "تعمیر ماشین لباسشویی",
+      "primary_parent_key": "services",
+      "parent_keys": [
+        "services"
+      ]
+    },
+    {
+      "key": "refrigerator-repair",
+      "name": "تعمیر یخچال",
+      "primary_parent_key": "services",
+      "parent_keys": [
+        "services"
+      ]
+    },
+    {
+      "key": "home-chef",
+      "name": "آشپزی در منزل",
+      "primary_parent_key": "services",
+      "parent_keys": [
+        "services"
+      ]
+    },
+    {
+      "key": "dry-cleaning",
+      "name": "خشکشویی",
+      "primary_parent_key": "services",
+      "parent_keys": [
+        "services"
+      ]
+    },
+    {
+      "key": "carpet-cleaning",
+      "name": "قالیشویی",
+      "primary_parent_key": "services",
+      "parent_keys": [
+        "services"
+      ]
+    },
+    {
+      "key": "services-plumber",
+      "name": "لوله کش",
+      "primary_parent_key": "services",
+      "parent_keys": [
+        "services"
+      ]
+    },
+    {
+      "key": "upholstery-cleaning",
+      "name": "شست‌وشوی مبل",
+      "primary_parent_key": "services",
+      "parent_keys": [
+        "services"
+      ]
+    },
+    {
+      "key": "cabinet-installation",
+      "name": "نصب کابینت و دکوراسیون",
+      "primary_parent_key": "services",
+      "parent_keys": [
+        "services"
+      ]
+    },
+    {
+      "key": "house-cleaning",
+      "name": "نظافت منزل",
+      "primary_parent_key": "services",
+      "parent_keys": [
+        "services"
+      ]
+    },
+    {
+      "key": "services-house-painting",
+      "name": "نقاش ساختمان",
+      "primary_parent_key": "services",
+      "parent_keys": [
+        "services"
+      ]
+    },
+    {
+      "key": "services-cabinet-maker",
+      "name": "کابینت ساز",
+      "primary_parent_key": "services",
+      "parent_keys": [
+        "services"
+      ]
+    },
+    {
+      "key": "tiler-construction",
+      "name": " کاشی‌کاری و بنایی",
+      "primary_parent_key": "services",
+      "parent_keys": [
+        "services"
+      ]
+    },
+    {
+      "key": "locksmith",
+      "name": "کلیدساز",
+      "primary_parent_key": "services",
+      "parent_keys": [
+        "services"
+      ]
+    },
+    {
+      "key": "cooking-school",
+      "name": "آموزش آشپزی",
+      "primary_parent_key": "education",
+      "parent_keys": [
+        "education"
+      ]
+    },
+    {
+      "key": "accounting-school",
+      "name": "آموزش حسابداری",
+      "primary_parent_key": "education",
+      "parent_keys": [
+        "education"
+      ]
+    },
+    {
+      "key": "driving-school",
+      "name": "آموزش رانندگی",
+      "primary_parent_key": "education",
+      "parent_keys": [
+        "education"
+      ]
+    },
+    {
+      "key": "language-school",
+      "name": "آموزش زبان",
+      "primary_parent_key": "education",
+      "parent_keys": [
+        "education"
+      ]
+    },
+    {
+      "key": "music-school",
+      "name": " آموزش موسیقی",
+      "primary_parent_key": "education",
+      "parent_keys": [
+        "education"
+      ]
+    },
+    {
+      "key": "art-school",
+      "name": "آموزش نقاشی و هنرهای تجسمی",
+      "primary_parent_key": "education",
+      "parent_keys": [
+        "education"
+      ]
+    },
+    {
+      "key": "school",
+      "name": "مدرسه",
+      "primary_parent_key": "education",
+      "parent_keys": [
+        "education"
+      ]
+    },
+    {
+      "key": "kindergarden",
+      "name": "مهدکودک",
+      "primary_parent_key": "education",
+      "parent_keys": [
+        "education"
+      ]
+    },
+    {
+      "key": "shops-persian-supermarket",
+      "name": "سوپرمارکت",
+      "primary_parent_key": "shops",
+      "parent_keys": [
+        "shops"
+      ]
+    },
+    {
+      "key": "jewlery-store",
+      "name": "طلا فروشی",
+      "primary_parent_key": "shops",
+      "parent_keys": [
+        "shops"
+      ]
+    },
+    {
+      "key": "carpet-store",
+      "name": "فرش فروشی",
+      "primary_parent_key": "shops",
+      "parent_keys": [
+        "shops"
+      ]
+    },
+    {
+      "key": "accessories-store",
+      "name": "بدلیجات و اکسسوری",
+      "primary_parent_key": "shops",
+      "parent_keys": [
+        "shops"
+      ]
+    },
+    {
+      "key": "cultural-goods",
+      "name": "فروشگاه کالای فرهنگی",
+      "primary_parent_key": "shops",
+      "parent_keys": [
+        "shops"
+      ]
+    },
+    {
+      "key": "bookstore-stationery",
+      "name": "کتاب و نوشت افزار",
+      "primary_parent_key": "shops",
+      "parent_keys": [
+        "shops"
+      ]
+    },
+    {
+      "key": "womens-clothing",
+      "name": "مزون و پوشاک زنانه",
+      "primary_parent_key": "shops",
+      "parent_keys": [
+        "shops"
+      ]
+    },
+    {
+      "key": "childrens-clothing",
+      "name": "پوشاک کودک",
+      "primary_parent_key": "shops",
+      "parent_keys": [
+        "shops"
+      ]
+    },
+    {
+      "key": "furniture-store",
+      "name": "مبل فروشی",
+      "primary_parent_key": "shops",
+      "parent_keys": [
+        "shops"
+      ]
+    },
+    {
+      "key": "gallery",
+      "name": "گالری",
+      "primary_parent_key": "shops",
+      "parent_keys": [
+        "shops"
+      ]
+    },
+    {
+      "key": "florist",
+      "name": " گل‌فروشی‌",
+      "primary_parent_key": "shops",
+      "parent_keys": [
+        "shops"
+      ]
+    },
+    {
+      "key": "car-rental",
+      "name": "اجاره خودرو",
+      "primary_parent_key": "auto-transport",
+      "parent_keys": [
+        "auto-transport"
+      ]
+    },
+    {
+      "key": "moving-company",
+      "name": "اسباب کشی و باربری",
+      "primary_parent_key": "auto-transport",
+      "parent_keys": [
+        "auto-transport"
+      ]
+    },
+    {
+      "key": "auto-electrician",
+      "name": "برق‌کار خودرو",
+      "primary_parent_key": "auto-transport",
+      "parent_keys": [
+        "auto-transport"
+      ]
+    },
+    {
+      "key": "oil-change",
+      "name": "تعویض روغن",
+      "primary_parent_key": "auto-transport",
+      "parent_keys": [
+        "auto-transport"
+      ]
+    },
+    {
+      "key": "car-dealer",
+      "name": "خرید و فروش خودرو",
+      "primary_parent_key": "auto-transport",
+      "parent_keys": [
+        "auto-transport"
+      ]
+    },
+    {
+      "key": "auto-body-shop",
+      "name": "صافکاری و رنگ خودرو",
+      "primary_parent_key": "auto-transport",
+      "parent_keys": [
+        "auto-transport"
+      ]
+    },
+    {
+      "key": "auto-parts-store",
+      "name": "لوازم و قطعات خودرو",
+      "primary_parent_key": "auto-transport",
+      "parent_keys": [
+        "auto-transport"
+      ]
+    },
+    {
+      "key": "auto-repair",
+      "name": "مکانیکی",
+      "primary_parent_key": "auto-transport",
+      "parent_keys": [
+        "auto-transport"
+      ]
+    },
+    {
+      "key": "mobile-car-wash",
+      "name": "کارواش سیار",
+      "primary_parent_key": "auto-transport",
+      "parent_keys": [
+        "auto-transport"
+      ]
+    },
+    {
+      "key": "travel-agency",
+      "name": "آژانس مسافرتی و گردشگری",
+      "primary_parent_key": "sports-entertainment",
+      "parent_keys": [
+        "sports-entertainment"
+      ]
+    },
+    {
+      "key": "gym-personal-trainer",
+      "name": "باشگاه و مربی بدنسازی",
+      "primary_parent_key": "sports-entertainment",
+      "parent_keys": [
+        "sports-entertainment"
+      ]
+    },
+    {
+      "key": "city-tours",
+      "name": "تور شهری",
+      "primary_parent_key": "sports-entertainment",
+      "parent_keys": [
+        "sports-entertainment"
+      ]
+    },
+    {
+      "key": "nature-tours",
+      "name": "تورهای طبیعت‌گردی",
+      "primary_parent_key": "sports-entertainment",
+      "parent_keys": [
+        "sports-entertainment"
+      ]
+    },
+    {
+      "key": "persian-djs-event-bands",
+      "name": "دی‌جی و گروه موسیقی",
+      "primary_parent_key": "sports-entertainment",
+      "parent_keys": [
+        "sports-entertainment"
+      ]
+    },
+    {
+      "key": "club",
+      "name": "کلاب",
+      "primary_parent_key": "sports-entertainment",
+      "parent_keys": [
+        "sports-entertainment"
+      ]
+    },
+    {
+      "key": "trx-classes",
+      "name": " باشگاه TRX",
+      "primary_parent_key": "sports-entertainment",
+      "parent_keys": [
+        "sports-entertainment"
+      ]
+    },
+    {
+      "key": "basketball-class",
+      "name": " باشگاه بسکتبال",
+      "primary_parent_key": "sports-entertainment",
+      "parent_keys": [
+        "sports-entertainment"
+      ]
+    },
+    {
+      "key": "boxing-classes",
+      "name": "باشگاه بوکس",
+      "primary_parent_key": "sports-entertainment",
+      "parent_keys": [
+        "sports-entertainment"
+      ]
+    },
+    {
+      "key": "billiards-classes",
+      "name": "باشگاه بیلیارد",
+      "primary_parent_key": "sports-entertainment",
+      "parent_keys": [
+        "sports-entertainment"
+      ]
+    },
+    {
+      "key": "tennis-classes",
+      "name": "باشگاه تنیس",
+      "primary_parent_key": "sports-entertainment",
+      "parent_keys": [
+        "sports-entertainment"
+      ]
+    },
+    {
+      "key": "dance-classes",
+      "name": "کلاس رقص",
+      "primary_parent_key": "sports-entertainment",
+      "parent_keys": [
+        "sports-entertainment"
+      ]
+    },
+    {
+      "key": "zumba-classes",
+      "name": "کلاس زومبا",
+      "primary_parent_key": "sports-entertainment",
+      "parent_keys": [
+        "sports-entertainment"
+      ]
+    },
+    {
+      "key": "swimming-classes",
+      "name": "کلاس شنا",
+      "primary_parent_key": "sports-entertainment",
+      "parent_keys": [
+        "sports-entertainment"
+      ]
+    },
+    {
+      "key": "football-classes",
+      "name": "باشگاه فوتبال",
+      "primary_parent_key": "sports-entertainment",
+      "parent_keys": [
+        "sports-entertainment"
+      ]
+    },
+    {
+      "key": "volleyball-classes",
+      "name": "باشگاه والیبال",
+      "primary_parent_key": "sports-entertainment",
+      "parent_keys": [
+        "sports-entertainment"
+      ]
+    },
+    {
+      "key": "martial-arts-classes",
+      "name": "آموزش هنرهای رزمی",
+      "primary_parent_key": "sports-entertainment",
+      "parent_keys": [
+        "sports-entertainment"
+      ]
+    },
+    {
+      "key": "gymnastics-classes",
+      "name": "باشگاه ژیمناستیک",
+      "primary_parent_key": "sports-entertainment",
+      "parent_keys": [
+        "sports-entertainment"
+      ]
+    },
+    {
+      "key": "crossfit-classes",
+      "name": "باشگاه کراس فیت",
+      "primary_parent_key": "sports-entertainment",
+      "parent_keys": [
+        "sports-entertainment"
+      ]
+    },
+    {
+      "key": "wrestling-classes",
+      "name": "باشگاه کشتی",
+      "primary_parent_key": "sports-entertainment",
+      "parent_keys": [
+        "sports-entertainment"
+      ]
+    },
+    {
+      "key": "yoga-classes",
+      "name": "باشگاه یوگا",
+      "primary_parent_key": "sports-entertainment",
+      "parent_keys": [
+        "sports-entertainment"
+      ]
+    },
+    {
+      "key": "concert",
+      "name": "کنسرت",
+      "primary_parent_key": "sports-entertainment",
+      "parent_keys": [
+        "sports-entertainment"
+      ]
+    },
+    {
+      "key": "orthopedics",
+      "name": "ارتوپدی",
+      "primary_parent_key": "health",
+      "parent_keys": [
+        "health"
+      ]
+    },
+    {
+      "key": "neurology-psychiatry",
+      "name": "اعصاب و روان",
+      "primary_parent_key": "health",
+      "parent_keys": [
+        "health"
+      ]
+    },
+    {
+      "key": "urology",
+      "name": "اورولوژی",
+      "primary_parent_key": "health",
+      "parent_keys": [
+        "health"
+      ]
+    },
+    {
+      "key": "otolaryngology",
+      "name": "جراح سر و گردن",
+      "primary_parent_key": "health",
+      "parent_keys": [
+        "health"
+      ]
+    },
+    {
+      "key": "plastic-cosmetic-surgery",
+      "name": "جراح پلاستیک و زیبایی",
+      "primary_parent_key": "health",
+      "parent_keys": [
+        "health"
+      ]
+    },
+    {
+      "key": "pharmacy",
+      "name": "داروخانه",
+      "primary_parent_key": "health",
+      "parent_keys": [
+        "health"
+      ]
+    },
+    {
+      "key": "dentist",
+      "name": "دندانپزشک",
+      "primary_parent_key": "health",
+      "parent_keys": [
+        "health"
+      ]
+    },
+    {
+      "key": "psychiatrist",
+      "name": "روانپزشک",
+      "primary_parent_key": "health",
+      "parent_keys": [
+        "health"
+      ]
+    },
+    {
+      "key": "gynecology-obstetrics",
+      "name": "زنان و زایمان",
+      "primary_parent_key": "health",
+      "parent_keys": [
+        "health"
+      ]
+    },
+    {
+      "key": "physiotherapy",
+      "name": "فیزیوتراپی",
+      "primary_parent_key": "health",
+      "parent_keys": [
+        "health"
+      ]
+    },
+    {
+      "key": "persian-pediatrician",
+      "name": "متخصص اطفال",
+      "primary_parent_key": "health",
+      "parent_keys": [
+        "health"
+      ]
+    },
+    {
+      "key": "internal-medicine",
+      "name": "متخصص داخلی",
+      "primary_parent_key": "health",
+      "parent_keys": [
+        "health"
+      ]
+    },
+    {
+      "key": "Gastroenterologist",
+      "name": "متخصص گوارش",
+      "primary_parent_key": "health",
+      "parent_keys": [
+        "health"
+      ]
+    },
+    {
+      "key": "medical-imaging",
+      "name": "مرکز تصویربرداری پزشکی",
+      "primary_parent_key": "health",
+      "parent_keys": [
+        "health"
+      ]
+    },
+    {
+      "key": "counseling-psychology",
+      "name": "مشاوره و روانشناسی",
+      "primary_parent_key": "health",
+      "parent_keys": [
+        "health"
+      ]
+    },
+    {
+      "key": "general-practitioner",
+      "name": "پزشک عمومی",
+      "primary_parent_key": "health",
+      "parent_keys": [
+        "health"
+      ]
+    },
+    {
+      "key": "dermatology",
+      "name": "پوست و مو",
+      "primary_parent_key": "health",
+      "parent_keys": [
+        "health"
+      ]
+    },
+    {
+      "key": "ophthalmologist",
+      "name": "چشم پزشک",
+      "primary_parent_key": "health",
+      "parent_keys": [
+        "health"
+      ]
+    },
+    {
+      "key": "content-creation",
+      "name": "تولید محتوا",
+      "primary_parent_key": "digital-and-technology-services",
+      "parent_keys": [
+        "digital-and-technology-services"
+      ]
+    },
+    {
+      "key": "video-production-motion-graphics",
+      "name": "تولید ویدئو و موشن گرافی",
+      "primary_parent_key": "digital-and-technology-services",
+      "parent_keys": [
+        "digital-and-technology-services"
+      ]
+    },
+    {
+      "key": "it-services",
+      "name": "خدمات فناوری اطلاعات (IT)",
+      "primary_parent_key": "digital-and-technology-services",
+      "parent_keys": [
+        "digital-and-technology-services"
+      ]
+    },
+    {
+      "key": "ai-automation-services",
+      "name": "خدمات هوش مصنوعی و اتوماسیون",
+      "primary_parent_key": "digital-and-technology-services",
+      "parent_keys": [
+        "digital-and-technology-services"
+      ]
+    },
+    {
+      "key": "google-ads-services",
+      "name": "خدمات گوگل ادز",
+      "primary_parent_key": "digital-and-technology-services",
+      "parent_keys": [
+        "digital-and-technology-services"
+      ]
+    },
+    {
+      "key": "digital-marketing",
+      "name": "دیجیتال مارکتینگ",
+      "primary_parent_key": "digital-and-technology-services",
+      "parent_keys": [
+        "digital-and-technology-services"
+      ]
+    },
+    {
+      "key": "seo-services",
+      "name": "سئو (SEO)",
+      "primary_parent_key": "digital-and-technology-services",
+      "parent_keys": [
+        "digital-and-technology-services"
+      ]
+    },
+    {
+      "key": "app-software-design",
+      "name": "طراحی اپلیکیشن و نرم‌افزار",
+      "primary_parent_key": "digital-and-technology-services",
+      "parent_keys": [
+        "digital-and-technology-services"
+      ]
+    },
+    {
+      "key": "website-design",
+      "name": "طراحی سایت",
+      "primary_parent_key": "digital-and-technology-services",
+      "parent_keys": [
+        "digital-and-technology-services"
+      ]
+    },
+    {
+      "key": "graphic-design",
+      "name": "طراحی گرافیک",
+      "primary_parent_key": "digital-and-technology-services",
+      "parent_keys": [
+        "digital-and-technology-services"
+      ]
+    },
+    {
+      "key": "persian-photography",
+      "name": "عکاسی",
+      "primary_parent_key": "digital-and-technology-services",
+      "parent_keys": [
+        "digital-and-technology-services"
+      ]
+    },
+    {
+      "key": "social-media-management",
+      "name": "مدیریت شبکه‌های اجتماعی",
+      "primary_parent_key": "digital-and-technology-services",
+      "parent_keys": [
+        "digital-and-technology-services"
+      ]
+    },
+    {
+      "key": "building-renovation-restoration",
+      "name": "بازسازی و نوسازی ساختمان",
+      "primary_parent_key": "construction-and-building",
+      "parent_keys": [
+        "construction-and-building"
+      ]
+    },
+    {
+      "key": "construction-and-building-electrician",
+      "name": "برق‌کاری ساختمان",
+      "primary_parent_key": "construction-and-building",
+      "parent_keys": [
+        "construction-and-building"
+      ]
+    },
+    {
+      "key": "hvac-systems",
+      "name": "سیستم‌های گرمایش، سرمایش و تهویه",
+      "primary_parent_key": "construction-and-building",
+      "parent_keys": [
+        "construction-and-building"
+      ]
+    },
+    {
+      "key": "persian-construction-companies",
+      "name": "شرکت‌های ساختمانی و ساخت‌وساز",
+      "primary_parent_key": "construction-and-building",
+      "parent_keys": [
+        "construction-and-building"
+      ]
+    },
+    {
+      "key": "interior-design-decoration",
+      "name": "طراحی و دکوراسیون داخلی",
+      "primary_parent_key": "construction-and-building",
+      "parent_keys": [
+        "construction-and-building"
+      ]
+    },
+    {
+      "key": "construction-and-building-plumber",
+      "name": "لوله‌کشی و تأسیسات ساختمان",
+      "primary_parent_key": "construction-and-building",
+      "parent_keys": [
+        "construction-and-building"
+      ]
+    },
+    {
+      "key": "building-materials-equipment",
+      "name": "مصالح و تجهیزات ساختمانی",
+      "primary_parent_key": "construction-and-building",
+      "parent_keys": [
+        "construction-and-building"
+      ]
+    },
+    {
+      "key": "architectural-building-design",
+      "name": "معماری و طراحی ساختمان",
+      "primary_parent_key": "construction-and-building",
+      "parent_keys": [
+        "construction-and-building"
+      ]
+    },
+    {
+      "key": "civil-structural-engineering",
+      "name": "مهندسی عمران و سازه",
+      "primary_parent_key": "construction-and-building",
+      "parent_keys": [
+        "construction-and-building"
+      ]
+    },
+    {
+      "key": "construction-and-building-house-painting",
+      "name": "نقاشی ساختمان",
+      "primary_parent_key": "construction-and-building",
+      "parent_keys": [
+        "construction-and-building"
+      ]
+    },
+    {
+      "key": "building-contractor",
+      "name": "پیمانکار ساختمان",
+      "primary_parent_key": "construction-and-building",
+      "parent_keys": [
+        "construction-and-building"
+      ]
+    },
+    {
+      "key": "construction-and-building-cabinet-maker",
+      "name": "کابینت‌سازی و نجاری",
+      "primary_parent_key": "construction-and-building",
+      "parent_keys": [
+        "construction-and-building"
+      ]
+    }
+  ]
+}

@@ -71,6 +71,9 @@ export interface ServiceCategoryAssignment {
 }
 
 export interface Service {
+  google_maps_url?: string | null;
+  description_original?: string | null;
+  import_data?: Record<string, unknown> | null;
   id: number;
 
   owner_user_id: number | null;
@@ -144,6 +147,7 @@ export interface ServiceCategoryInput {
 }
 
 export interface ServiceCreatePayload {
+  google_maps_url?: string | null;
   name: string;
   description?: string | null;
   owner_user_id?: number | null;
@@ -179,6 +183,7 @@ export interface ServiceCreatePayload {
 export type ServiceRelevanceUpdate = Partial<Record<RelevanceKey, RelevanceAnswer>>;
 
 export interface ServiceUpdatePayload {
+  google_maps_url?: string | null;
   name?: string;
   description?: string | null;
   owner_user_id?: number | null;

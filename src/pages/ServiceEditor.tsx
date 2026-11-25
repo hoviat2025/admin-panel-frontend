@@ -131,6 +131,8 @@ const ServiceEditor = () => {
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [googleMapsUrl, setGoogleMapsUrl] = useState("");
+  const [importData, setImportData] = useState<Record<string, unknown> | null>(null);
 
   const [address, setAddress] = useState("");
   const [postalCode, setPostalCode] = useState("");
@@ -206,6 +208,8 @@ const ServiceEditor = () => {
         setIsStale(false);
         setName(service.name ?? "");
         setDescription(service.description ?? "");
+        setGoogleMapsUrl(service.google_maps_url ?? "");
+        setImportData(service.import_data ?? null);
         setCoverImageUrl(service.cover_image_url ?? null);
         setPendingImage(null);
         setRemoveImageRequested(false);
@@ -444,6 +448,7 @@ const ServiceEditor = () => {
         country_code: countryCode.trim().toUpperCase() || null,
         latitude: latitude === "" ? null : Number(latitude),
         longitude: longitude === "" ? null : Number(longitude),
+        google_maps_url: googleMapsUrl.trim() || null,
         // "unknown" is sent as null, never as false.
         persian_owned: relevanceChoiceToAnswer(persianOwned),
         persian_provider: relevanceChoiceToAnswer(persianProvider),
@@ -549,6 +554,7 @@ const ServiceEditor = () => {
               </Section>
               <Section title="تصویر معرفی" description="این تصویر در فهرست و صفحهٔ عمومی کسب‌وکار استفاده می‌شود."><ServiceCoverImage savedUrl={coverImageUrl} file={pendingImage} removeRequested={removeImageRequested} disabled={isSaving} onChange={changeImage} /></Section>
               <Section title="نشانی و موقعیت" description="کشور، ایالت و شهر به پیدا شدن کسب‌وکار در جستجو کمک می‌کنند.">
+                <FieldLabel hint="پیوند اشتراک‌گذاری Google Maps را وارد کنید؛ در این حالت نیازی به مختصات نیست.">پیوند Google Maps<Input dir="ltr" value={googleMapsUrl} onChange={event => setGoogleMapsUrl(event.target.value)} placeholder="https://maps.app.goo.gl/…" maxLength={4096} /></FieldLabel>
                 <div className="se-form-grid">
                   <FieldLabel>کشور<select value={countryCode} onChange={(event) => { setCountryCode(event.target.value); setState(""); setCity(""); }} disabled={isLoadingLocations}><option value="">انتخاب کشور</option>{locationCatalogue.map((country) => <option key={country.country_code} value={country.country_code}>{country.country_code === "DE" ? "آلمان" : country.country_code}</option>)}{countryCode && !locationCatalogue.some((country) => country.country_code === countryCode) && <option value={countryCode}>{countryCode}</option>}</select></FieldLabel>
                   <FieldLabel>ایالت<select value={selectedLocationState?.state ?? state} disabled={isLoadingLocations || !countryCode} onChange={(event) => { setState(event.target.value); setCity(""); setNewCity(""); }}><option value="">انتخاب ایالت</option>{locationStates.map((region) => <option key={region.id} value={region.state}>{region.state}</option>)}{state && !selectedLocationState && <option value={state} disabled>{state} — نیاز به انتخاب مجدد</option>}</select></FieldLabel>
@@ -624,7 +630,7 @@ const ServiceEditor = () => {
                 <div className="se-owner-selected"><span className="se-owner-avatar"><User size={23} /></span><div><strong>{ownerUserId === null ? "مالک تعیین نشده" : "حساب مالک انتخاب شده"}</strong><p>{ownerUserId === null ? "این کسب‌وکار می‌تواند بدون مالک ثبت شود." : "شناسهٔ کاربر: " + ownerUserId}</p></div>{ownerUserId !== null && <button type="button" className="se-button se-button--quiet" onClick={() => setOwnerUserId(null)}><X size={15} />حذف</button>}</div>
                 <div className="se-switch-row"><div><strong>اجازهٔ نمایش فرد مرتبط</strong><p>نمایش عمومی فقط با اجازهٔ خود فرد برای این کسب‌وکار و عمومی بودن پروفایل او انجام می‌شود.</p></div><Switch checked={showOwner} onCheckedChange={setShowOwner} aria-label="اجازه نمایش عمومی فرد مرتبط" /></div>
               </Section>
-              <Section title="منبع ثبت اطلاعات" description="اختیاری؛ برای شناسایی رکوردهای واردشده از یک منبع دیگر."><div className="se-form-grid"><FieldLabel hint="منبع و شناسهٔ خارجی باید با هم تکمیل شوند.">منبع<Input dir="ltr" value={source} onChange={(event) => setSource(event.target.value)} placeholder="مثلاً atlas" /></FieldLabel><FieldLabel>شناسه در منبع<Input dir="ltr" value={externalId} onChange={(event) => setExternalId(event.target.value)} placeholder="شناسهٔ پایدار و یکتا" /></FieldLabel></div></Section>
+              <Section title="منبع ثبت اطلاعات" description="اختیاری؛ برای شناسایی رکوردهای واردشده از یک منبع دیگر."><div className="se-form-grid"><FieldLabel hint="منبع و شناسهٔ خارجی باید با هم تکمیل شوند.">منبع<Input dir="ltr" value={source} onChange={(event) => setSource(event.target.value)} placeholder="مثلاً atlas" /></FieldLabel><FieldLabel>شناسه در منبع<Input dir="ltr" value={externalId} onChange={(event) => setExternalId(event.target.value)} placeholder="شناسهٔ پایدار و یکتا" /></FieldLabel></div>{importData && <details><summary>متن و اطلاعات اصلی استخراج (خصوصی)</summary><pre dir="auto" style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", maxHeight: 400, overflow: "auto" }}>{JSON.stringify(importData, null, 2)}</pre></details>}</Section>
             </>}
           </div></fieldset>
         </div>

@@ -77,7 +77,7 @@ const ServiceManagement = () => {
     <main className="business-workspace">
       <header className="business-workspace__heading">
         <div><p className="business-workspace__eyebrow">فهرست خدمات و کسب‌وکارها</p><h1>مدیریت کسب‌وکارها</h1><p>اطلاعات، وضعیت انتشار و مالک هر کسب‌وکار را مدیریت کنید.</p></div>
-        <Link className="business-create" to="/services/new"><Plus size={19} />افزودن کسب‌وکار</Link>
+        <div className="flex flex-wrap gap-3"><Link className="business-create" to="/services/import">ورود از JSON</Link><Link className="business-create" to="/services/new"><Plus size={19} />افزودن کسب‌وکار</Link></div>
       </header>
 
       <section className="business-toolbar" aria-label="جست‌وجو و فیلترها">
