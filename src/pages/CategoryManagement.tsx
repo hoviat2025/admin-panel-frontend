@@ -142,7 +142,7 @@ const CategoryManagement = () => {
     <main className="category-main">
       <header className="category-heading">
         <div className="category-heading__copy"><div className="category-heading__eyebrow"><span><Layers3 size={18} /></span>ساختار فهرست خدمات</div><h2>مدیریت دسته‌بندی‌ها</h2><p>گروه را باز کنید تا دسته‌های آن را ببینید. فقط دسته‌های سطح دوم به کسب‌وکار اختصاص داده می‌شوند.</p></div>
-        <div className="category-heading__actions"><Link to="/services" className="category-services-link">فهرست سرویس‌ها <ArrowLeft size={16} /></Link><Button variant="gold" onClick={() => openCreate()} disabled={isBusy}><Plus size={18} />گروه جدید</Button></div>
+        <div className="category-heading__actions"><Link to="/services/import?type=categories" className="category-services-link">ورود دسته‌ها از JSON</Link><Link to="/services" className="category-services-link">فهرست سرویس‌ها <ArrowLeft size={16} /></Link><Button variant="gold" onClick={() => openCreate()} disabled={isBusy}><Plus size={18} />گروه جدید</Button></div>
       </header>
       {loadError && <div className="category-load-error" role="alert"><Info size={19} /><p>{loadError}</p><Button variant="outline" size="sm" onClick={load} disabled={isLoading}>تلاش دوباره</Button></div>}
       <div className="category-layout">

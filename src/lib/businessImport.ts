@@ -1,9 +1,10 @@
 import { API_BASE_URL } from "@/config";
 import { authenticatedFetch } from "@/lib/authSession";
 import catalogue from "@/data/import-category-catalogue.json";
+import { canonicalCategoryKey, mergeDefinitions, readImportFiles, type Definition } from "@/lib/categoryImport";
 
 type JsonObject = Record<string, unknown>;
-export type Definition = { key: string; name: string; primary_parent_key?: string | null; parent_keys?: string[]; reason?: string };
+export type { Definition } from "@/lib/categoryImport";
 export type ImportRow = {
   service: JsonObject & { name: string; source: string; external_id: string };
   description_original: string | null; google_maps_url: string | null;
@@ -13,23 +14,15 @@ export type ImportRow = {
 export type ImportDocument = { schema_version: string; sources: JsonObject[]; businesses: Omit<ImportRow, "sources">[]; skipped: JsonObject[]; category_suggestions: { parents: Definition[]; categories: Definition[] } };
 export type ImportResult = { external_id: string; name?: string; service_id?: number; action: "created" | "updated" | "skipped" | "error"; message?: string; expected_updated_at?: string | null; new_categories?: { key: string; name: string }[] };
 export type PreparedImport = { rows: ImportRow[]; definitions: Definition[]; skipped: JsonObject[]; files: string[] };
-const MAX_FILE_BYTES = 10 * 1024 * 1024;
-const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
 
 export async function prepareImport(files: File[]): Promise<PreparedImport> {
-  if (files.reduce((sum, file) => sum + file.size, 0) > MAX_TOTAL_BYTES) throw new Error("مجموع فایل‌ها باید کمتر از ۲۵ مگابایت باشد.");
-  const definitions = new Map<string, Definition>([...catalogue.parents, ...catalogue.categories].map(d => [d.key.toLowerCase(), d]));
+  const docs = await readImportFiles(files);
+  const groups: unknown[] = [catalogue];
   const rows: ImportRow[] = [], skipped: JsonObject[] = [], seen = new Set<string>();
-  for (const file of files) {
-    if (file.size > MAX_FILE_BYTES) throw new Error(`${file.name}: حداکثر اندازه هر فایل ۱۰ مگابایت است.`);
-    const doc = JSON.parse((await file.text()).replace(/^\uFEFF/, "")) as ImportDocument;
+  for (const [index, file] of files.entries()) {
+    const doc = docs[index] as ImportDocument;
     if (doc.schema_version !== "1.0" || !Array.isArray(doc.businesses) || !Array.isArray(doc.sources) || !Array.isArray(doc.skipped) || !Array.isArray(doc.category_suggestions?.parents) || !Array.isArray(doc.category_suggestions?.categories)) throw new Error(`${file.name}: قالب فایل استخراج معتبر نیست.`);
-    for (const d of [...doc.category_suggestions.parents, ...doc.category_suggestions.categories]) {
-      if (!d || typeof d.key !== "string" || typeof d.name !== "string") throw new Error("تعریف دسته ناقص است.");
-      const key = d.key.toLowerCase(), old = definitions.get(key);
-      if (old && (old.name !== d.name || old.primary_parent_key !== d.primary_parent_key || JSON.stringify([...(old.parent_keys || [])].sort()) !== JSON.stringify([...(d.parent_keys || [])].sort()))) throw new Error(`تعریف‌های ناسازگار برای دسته ${d.key}`);
-      definitions.set(key, d);
-    }
+    groups.push(doc.category_suggestions);
     const sources = new Map(doc.sources.map(s => [s.source_ref, s]));
     if (sources.size !== doc.sources.length) throw new Error(`${file.name}: شناسه منبع تکراری است.`);
     for (const row of doc.businesses) {
@@ -42,25 +35,20 @@ export async function prepareImport(files: File[]): Promise<PreparedImport> {
       const selectedSources = refs.map(ref => sources.get(ref));
       if (selectedSources.some(s => !s)) throw new Error(`${row.service.name}: منبع ارجاع‌داده‌شده موجود نیست.`);
       rows.push({ service: row.service, description_original: row.description_original ?? null,
-        google_maps_url: row.google_maps_url ?? null, category_assignments: row.category_assignments,
+        google_maps_url: row.google_maps_url ?? null, category_assignments: row.category_assignments.map(a => ({ ...a, category_key: canonicalCategoryKey(a.category_key) })),
         metadata: row.metadata, sources: selectedSources as JsonObject[] });
     }
     skipped.push(...doc.skipped.map(item => ({ ...item, file: file.name })));
   }
   if (!rows.length) throw new Error("هیچ کسب‌وکاری برای ورود وجود ندارد.");
-  // Keep only definitions needed by these rows, recursively including parents.
-  const needed = new Map<string, Definition>();
-  const visit = (key: string, stack = new Set<string>()) => {
-    key = key.toLowerCase();
-    if (stack.has(key)) throw new Error("چرخه در دسته‌بندی‌ها پیدا شد.");
-    if (needed.has(key)) return;
-    const d = definitions.get(key);
-    if (!d) return; // May already exist in the live catalogue; server resolves it.
-    needed.set(key, d);
-    for (const p of d.parent_keys || []) visit(p, new Set([...stack, key]));
-  };
-  rows.forEach(row => row.category_assignments.forEach(a => visit(a.category_key)));
-  return { rows, definitions: [...needed.values()], skipped, files: files.map(f => f.name) };
+  // Import the entire catalogue before businesses, including unused suggestions.
+  const definitions = mergeDefinitions(groups);
+  const byKey = new Map(definitions.map(d => [d.key, d]));
+  for (const row of rows) for (const assignment of row.category_assignments) {
+    const d = byKey.get(assignment.category_key);
+    if (!d?.parent_keys?.length) throw new Error(`${row.service.name}: دسته دومرحله‌ای معتبر برای ${assignment.category_key} وجود ندارد.`);
+  }
+  return { rows, definitions, skipped, files: files.map(f => f.name) };
 }
 
 export function splitImport(rows: ImportRow[]): ImportRow[][] {
