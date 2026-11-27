@@ -117,7 +117,7 @@ export default function BusinessDuplicates() {
   }
 
   return <div dir="rtl"><Header /><main className="business-workspace duplicate-workspace">
-    <header className="business-workspace__heading"><div><h1>مدیریت تکراری‌ها</h1><p>خروجی کم‌حجم، تحلیل با هوش مصنوعی، سپس بررسی و ادغام.</p></div><Link to="/services">بازگشت به کسب‌وکارها</Link></header>
+    <header className="business-workspace__heading"><div><h1>مدیریت تکراری‌ها</h1><p>نسخه کامل‌تر را نگه دارید؛ در شرایط برابر، نسخه جدیدتر اولویت دارد.</p></div><Link to="/services">بازگشت به کسب‌وکارها</Link></header>
     {error && <p role="alert" className="duplicate-error">{error}</p>}
     {message && <p role="status">{message}</p>}
     <section className="duplicate-panel"><h2>۱. دریافت خروجی برای تحلیل</h2>
@@ -136,7 +136,7 @@ export default function BusinessDuplicates() {
         <Button variant="outline" disabled={busy || !results.length} onClick={() => downloadDuplicateFile("business-duplicates-report.txt", readableDuplicateReport(results), "text/plain")}>دانلود گزارش متنی</Button>
       </div>
       {results.map(r => <article className="duplicate-group" key={r.keep_id}>
-        <header><h3>نگه‌داری #{r.keep_id} · بایگانی {r.remove_ids.map(id => `#${id}`).join("، ")}</h3><span>{({ preview: "آماده بررسی", blocked: "مسدود", merged: "ادغام شد", already_applied: "قبلاً انجام شده", error: "خطا" } as Record<string, string>)[r.action] ?? r.action} · {r.confidence === "possible" ? "احتمالی" : "پیشنهاد قطعی"}</span></header>
+        <header><h3>نگه‌داری #{r.keep_id} · بایگانی {r.remove_ids.map(id => `#${id}`).join("، ")}</h3><span>{({ preview: "آماده بررسی", blocked: "مسدود", merged: "تکراری‌ها بایگانی شدند", already_applied: "قبلاً انجام شده", error: "خطا" } as Record<string, string>)[r.action] ?? r.action} · {r.confidence === "possible" ? "احتمالی" : "پیشنهاد قطعی"}</span></header>
         <p>{r.reason}</p>{r.message && <p role="alert">{r.message}</p>}
         {r.plan?.blocked.map(text => <p className="duplicate-error" key={text}>{text}</p>)}
         <div className="duplicate-records">{r.records?.map(record => <section key={record.service.id} className={record.service.id === r.keep_id ? "duplicate-keeper" : ""}>
@@ -146,11 +146,11 @@ export default function BusinessDuplicates() {
           <p>{record.categories.length} دسته · {record.bookmarks.length} ذخیره</p>
           <details><summary>تمام جزئیات و متن منبع</summary><pre dir="ltr">{JSON.stringify(record, null, 2)}</pre></details>
         </section>)}</div>
-        {r.plan && <details><summary>تغییرات دقیق، مقادیر متفاوت و اطلاعات قابل انتقال</summary><p>مقادیر متفاوتِ غیرخالی از رکورد نگه‌داری‌شده باقی می‌مانند؛ نسخه دیگر در بایگانی حفظ می‌شود. دسته اصلی تغییر نمی‌کند.</p><pre dir="ltr">{JSON.stringify(r.plan, null, 2)}</pre></details>}
-        {r.action === "preview" && r.confidence === "likely" && <label className="duplicate-check"><input type="checkbox" disabled={busy} checked={selected.has(r.keep_id)} onChange={e => { setConfirmed(false); setSelected(old => { const next = new Set(old); if (e.target.checked) next.add(r.keep_id); else next.delete(r.keep_id); return next; }); }} />این گروه را بررسی کردم و ادغام آن را تأیید می‌کنم</label>}
+        {r.plan && <p>رکورد #{r.keep_id} بدون تغییر باقی می‌ماند. نسخه کامل رکوردهای دیگر بایگانی و از فهرست فعال حذف می‌شود.</p>}
+        {r.action === "preview" && r.confidence === "likely" && <label className="duplicate-check"><input type="checkbox" disabled={busy} checked={selected.has(r.keep_id)} onChange={e => { setConfirmed(false); setSelected(old => { const next = new Set(old); if (e.target.checked) next.add(r.keep_id); else next.delete(r.keep_id); return next; }); }} />نگه‌داری این نسخه و حذف تکراری‌های این گروه را تأیید می‌کنم</label>}
       </article>)}
     </section>
-    <section className="duplicate-panel"><h2>۳. اعمال گروه‌های انتخاب‌شده</h2><p>نسخه کامل رکوردهای حذف‌شده در بایگانی خصوصی نگه‌داری می‌شود. تماس‌ها، دسته‌ها و ذخیره‌ها به رکورد اصلی منتقل می‌شوند. هیچ فایل تصویری حذف نمی‌شود.</p>
+    <section className="duplicate-panel"><h2>۳. اعمال گروه‌های انتخاب‌شده</h2><p>اطلاعات، تماس‌ها و دسته‌های رکورد اصلی تغییر نمی‌کنند. نسخه‌های تکراری از فهرست فعال حذف و به‌طور کامل بایگانی می‌شوند. ذخیره‌های کاربران به رکورد باقی‌مانده هدایت می‌شوند.</p>
       <label className="duplicate-check"><input type="checkbox" disabled={busy || !selected.size} checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />انتقال رکوردهای انتخاب‌شده از فهرست فعال به بایگانی را تأیید می‌کنم.</label>
       <Button disabled={busy || !selected.size || !confirmed} onClick={apply}>اعمال {selected.size} گروه انتخاب‌شده</Button>
     </section>

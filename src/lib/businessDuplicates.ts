@@ -9,7 +9,7 @@ export interface Snapshot {
 }
 export interface MergeResult extends DuplicateGroup {
   action: string; message?: string; records?: Snapshot[];
-  plan?: { blocked: string[]; conflicts: unknown[]; fill_empty_fields: Record<string, unknown>; add_contacts: unknown[]; add_category_ids: number[] };
+  plan?: { blocked: string[]; operation: "keep_unchanged_archive_others"; keep_id: number; archive_ids: number[]; bookmarks?: string; sources?: string };
 }
 export interface CompactPage { records: unknown[]; ceiling: number; next_after: number | null }
 export interface ArchivePage { records: { original_id: number; survivor_id: number | null; reason: string; archived_at: string }[]; next_after: number | null }

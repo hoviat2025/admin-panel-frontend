@@ -27,9 +27,9 @@ test("rejects malformed groups, invalid IDs and AI-supplied preview tokens", () 
   assert.throws(() => parseDuplicateFile(JSON.stringify({ schema_version: "2", groups: [] })));
 });
 
-test("downloadable text report retains full details and proposed changes", () => {
-  const report = readableDuplicateReport([{ ...group, action: "preview", records: [{ service: { id: 1, name: "Example", description: "full text" }, contacts: [], categories: [], bookmarks: [] }], plan: { conflicts: [{ field: "address" }], blocked: [], fill_empty_fields: {}, add_contacts: [], add_category_ids: [] } }]);
+test("downloadable text report retains full details and keep-only plan", () => {
+  const report = readableDuplicateReport([{ ...group, action: "preview", records: [{ service: { id: 1, name: "Example", description: "full text" }, contacts: [], categories: [], bookmarks: [] }], plan: { operation: "keep_unchanged_archive_others", keep_id: 3, archive_ids: [1, 2], blocked: [] } }]);
   assert.match(report, /full text/);
-  assert.match(report, /address/);
+  assert.match(report, /keep_unchanged_archive_others/);
   assert.match(report, /Example/);
 });
