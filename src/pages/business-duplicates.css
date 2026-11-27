@@ -15,5 +15,7 @@
 .duplicate-check { display: flex; align-items: start; gap: .6rem; margin: 1rem 0; }
 .duplicate-check input { margin-top: .3rem; }
 .duplicate-error { color: #a12222; background: #fff1f1; padding: .6rem; border-radius: .5rem; }
+.duplicate-incremental { margin: .8rem 0; padding: .9rem; border: 1px solid #cbdce8; border-radius: .8rem; background: #f2f8fc; }
+.duplicate-incremental select { max-width: 100%; }
 .duplicate-panel li { margin: .4rem 0; overflow-wrap: anywhere; }
 @media (max-width: 600px) { .duplicate-panel { padding: .8rem; } .duplicate-controls > button { width: 100%; } }

@@ -4,8 +4,9 @@ import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { fetchCategories, fetchLocationCatalogue } from "@/lib/serviceApi";
 import { Category } from "@/types/service";
-import { archivePage, archivedRecord, downloadDuplicateFile, exportDuplicatePage, mergeDuplicateGroups,
-  parseDuplicateFile, readableDuplicateReport, type ArchivePage, type DuplicateGroup, type MergeResult } from "@/lib/businessDuplicates";
+import { archivePage, archivedRecord, combineDuplicateFiles, downloadDuplicateFile, duplicateGroupKey, exportDuplicatePage, mergeDuplicateGroups,
+  readableDuplicateReport, type ArchivePage, type DuplicateGroup, type MergeResult } from "@/lib/businessDuplicates";
+import { buildReviewFiles, reviewZip, type CompactRecord } from "@/lib/duplicateReviewExport";
 import prompt from "@/data/business-duplicates-prompt.txt?raw";
 import "./service-management.css";
 import "./business-duplicates.css";
@@ -17,6 +18,12 @@ export default function BusinessDuplicates() {
   const [parents, setParents] = useState<Category[]>([]);
   const [city, setCity] = useState("");
   const [parent, setParent] = useState("");
+  const [incremental, setIncremental] = useState(false);
+  const [cutoff, setCutoff] = useState("");
+  const [maxRecords, setMaxRecords] = useState(300);
+  const [reviews, setReviews] = useState<Record<string, DuplicateGroup[]>>({});
+  const [coverage, setCoverage] = useState<{ received: number; total: number | null; complete: boolean } | null>(null);
+  const [keeperChoices, setKeeperChoices] = useState<Record<string, number>>({});
   const [groups, setGroups] = useState<DuplicateGroup[]>([]);
   const [results, setResults] = useState<MergeResult[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -44,12 +51,18 @@ export default function BusinessDuplicates() {
 
   async function exportData() {
     await perform(async () => {
+      const startedAt = new Date().toISOString();
+      const checkedThrough = incremental && cutoff ? new Date(cutoff).toISOString() : null;
+      if (incremental && !checkedThrough) throw new Error("زمان آخرین بررسی کامل را وارد کنید یا حالت بررسی تازه‌ها را خاموش کنید.");
+      if (incremental && (!Number.isInteger(maxRecords) || maxRecords < 2 || maxRecords > 5000)) throw new Error("تعداد رکورد هر فایل باید بین ۲ و ۵۰۰۰ باشد.");
+      if (checkedThrough && checkedThrough > startedAt) throw new Error("زمان آخرین بررسی نمی‌تواند در آینده باشد.");
       let after = 0, ceiling: number | undefined, bytes = 0;
-      const records: unknown[] = [];
+      const records: CompactRecord[] = [];
       do {
         const params = new URLSearchParams({ after: String(after), size: "200" });
         if (city.trim()) params.set("city", city.trim());
         if (parent) params.set("parent_id", parent);
+        if (checkedThrough) params.set("checked_through", checkedThrough);
         if (ceiling !== undefined) params.set("ceiling", String(ceiling));
         const page = await exportDuplicatePage(params);
         ceiling = page.ceiling;
@@ -61,18 +74,35 @@ export default function BusinessDuplicates() {
         if (page.next_after <= after) throw new Error("صفحه‌بندی خروجی معتبر نیست.");
         after = page.next_after;
       } while (after > 0);
-      downloadDuplicateFile("business-duplicate-candidates.json", JSON.stringify({ schema_version: "1.0", filters: { city: city || null, parent_id: parent || null }, records }, null, 2));
-      setMessage(`خروجی ${records.length} کسب‌وکار آماده شد. آن را همراه دستور تحلیل به هوش مصنوعی بدهید.`);
+      const filters = { city: city || null, parent_id: parent || null };
+      if (checkedThrough) {
+        const exportId = crypto.randomUUID();
+        setMessage("در حال آماده‌سازی بخش‌ها و فایل ZIP…");
+        await new Promise(resolve => setTimeout(resolve, 0));
+        const files = buildReviewFiles(records, { exportId, checkedThrough, startedAt, filters, maxRecords });
+        if (!files.length) { setMessage("رکورد تازه‌ای پس از زمان انتخاب‌شده نیست؛ برای بررسی همه، حالت بررسی تازه‌ها را خاموش کنید."); return; }
+        const blob = reviewZip([...files, { name: "analysis-prompt.txt", content: prompt }]);
+        const url = URL.createObjectURL(new Blob([blob], { type: "application/zip" }));
+        const link = document.createElement("a"); link.href = url; link.download = `business-review-${exportId.slice(0, 8)}.zip`; link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        const fresh = records.filter(r => r.review_status === "new").length;
+        setMessage(`بسته ${files.length - 1} بخشی آماده شد: ${fresh} تازه و ${records.length - fresh} قبلی. فایل ZIP را باز کنید؛ هر بخش را همراه دستور در یک جلسه جدا بدهید. سپس همه فایل‌های نتیجه را با هم وارد کنید.`);
+      } else {
+        downloadDuplicateFile("business-duplicate-candidates.json", JSON.stringify({ schema_version: "1.0", filters, records }, null, 2));
+        setMessage(`خروجی ${records.length} کسب‌وکار آماده شد. آن را همراه دستور تحلیل به هوش مصنوعی بدهید.`);
+      }
     });
   }
 
-  async function loadFile(file?: File) {
-    if (!file) return;
+  async function loadFiles(fileList: FileList | null) {
+    const files = Array.from(fileList ?? []);
+    if (!files.length) return;
     await perform(async () => {
-      setGroups([]); setResults([]); setSelected(new Set()); setConfirmed(false);
-      if (file.size > 2 * 1024 * 1024) throw new Error("حداکثر حجم نتیجه هوش مصنوعی ۲ مگابایت است.");
-      const parsed = parseDuplicateFile(await file.text());
-      setGroups(parsed); setMessage(`${parsed.length} گروه خوانده شد؛ ابتدا پیش‌نمایش را بگیرید.`);
+      setGroups([]); setResults([]); setSelected(new Set()); setConfirmed(false); setCoverage(null); setReviews({}); setKeeperChoices({});
+      if (files.length > 5000 || files.some(f => f.size > 2 * 1024 * 1024) || files.reduce((sum, f) => sum + f.size, 0) > 25 * 1024 * 1024) throw new Error("حداکثر هر فایل ۲ مگابایت و مجموع فایل‌ها ۲۵ مگابایت است.");
+      const parsed = combineDuplicateFiles(await Promise.all(files.map(f => f.text())));
+      setGroups(parsed.groups); setReviews(parsed.reviews); setCoverage(parsed.coverage);
+      setMessage(`${files.length} فایل و ${parsed.groups.length} گروه خوانده شد؛ ${Object.keys(parsed.reviews).length} گروه هم‌پوشان برای بررسی جداگانه علامت خورد. ابتدا پیش‌نمایش را بگیرید.`);
     });
   }
 
@@ -82,17 +112,30 @@ export default function BusinessDuplicates() {
       const collected: MergeResult[] = [];
       for (let i = 0; i < groups.length; i += 20) {
         const page = await mergeDuplicateGroups(groups.slice(i, i + 20), true);
-        collected.push(...page.results); setResults([...collected]);
+        collected.push(...page.results.map(r => ({ ...r, proposals: reviews[duplicateGroupKey(r)] }))); setResults([...collected]);
         setMessage(`بررسی ${Math.min(i + 20, groups.length)} از ${groups.length} گروه`);
       }
       setMessage("پیش‌نمایش آماده است. گروه‌های قطعی مورد تأییدتان را انتخاب کنید؛ موارد احتمالی فقط برای بررسی هستند.");
     });
   }
 
+  async function confirmPossible(result: MergeResult) {
+    await perform(async () => {
+      const key = duplicateGroupKey(result), keep = keeperChoices[key] ?? result.keep_id;
+      const confirmedGroup: DuplicateGroup = { keep_id: keep, remove_ids: [result.keep_id, ...result.remove_ids].filter(id => id !== keep), confidence: "likely",
+        reason: (`مدیر یکسان بودن همه موارد و نگه‌داری رکورد ${keep} را پس از بررسی تأیید کرد. ` + (result.proposals ?? [result]).map(g => g.reason).join("؛ ")).slice(0, 2000) };
+      const preview = (await mergeDuplicateGroups([confirmedGroup], true)).results[0];
+      setGroups(old => old.map(g => duplicateGroupKey(g) === key ? confirmedGroup : g));
+      setResults(old => old.map(r => duplicateGroupKey(r) === key ? { ...preview, proposals: result.proposals } : r));
+      setSelected(new Set()); setConfirmed(false);
+      setMessage("انتخاب شما در پیش‌نمایش به‌روزرسانی شد؛ هنوز هیچ رکوردی حذف نشده است.");
+    });
+  }
+
   async function apply() {
     await perform(async () => {
       const chosen = results.filter(r => selected.has(r.keep_id) && r.action === "preview" && r.confidence === "likely");
-      if (!confirmed || !chosen.length) throw new Error("ابتدا گروه‌ها و تأیید بایگانی را انتخاب کنید.");
+      if (!confirmed || !chosen.length || coverage?.complete === false) throw new Error("ابتدا همه بخش‌ها، گروه‌های انتخابی و تأیید بایگانی را بررسی کنید.");
       const updated = [...results];
       for (const r of chosen) {
         const { results: applied } = await mergeDuplicateGroups([{
@@ -124,20 +167,27 @@ export default function BusinessDuplicates() {
       <div className="duplicate-controls">
         <label>شهر (اختیاری)<input list="duplicate-cities" value={city} disabled={busy} onChange={e => setCity(e.target.value)} placeholder="همه شهرها" /><datalist id="duplicate-cities">{cities.map(c => <option key={c} value={c} />)}</datalist></label>
         <label>گروه اصلی (اختیاری)<select value={parent} disabled={busy} onChange={e => setParent(e.target.value)}><option value="">همه گروه‌ها</option>{parents.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-        <Button disabled={busy} onClick={exportData}>دانلود JSON کسب‌وکارها</Button>
+        <Button disabled={busy} onClick={exportData}>{incremental ? "دانلود بسته بخش‌بندی‌شده" : "دانلود JSON کسب‌وکارها"}</Button>
         <Button variant="outline" disabled={busy} onClick={() => downloadDuplicateFile("business-duplicates-prompt.txt", prompt, "text/plain")}>دانلود دستور تحلیل</Button>
       </div><p>فقط عنوان، تلفن‌ها، شهر، نشانی، تاریخ ایجاد و ۱۲۰ نویسه اول توضیحات صادر می‌شود. فیلترها اختیاری‌اند؛ رکوردهای بایگانی‌شده وارد خروجی نمی‌شوند.</p>
       <p>فیلتر شهر یا گروه ممکن است بعضی تکراری‌های میان گروه‌ها را از دید تحلیل پنهان کند.</p>
+      <label className="duplicate-check"><input type="checkbox" disabled={busy} checked={incremental} onChange={e => setIncremental(e.target.checked)} />فقط رکوردهای تازه را با داده‌های قبلی مقایسه کن</label>
+      {incremental && <div className="duplicate-incremental"><div className="duplicate-controls">
+        <label>بررسی کامل انجام‌شده تا<input type="datetime-local" value={cutoff} disabled={busy} onChange={e => setCutoff(e.target.value)} /></label>
+        <label>حداکثر رکورد در هر فایل<input type="number" min={2} max={5000} value={maxRecords} disabled={busy} onChange={e => setMaxRecords(Number(e.target.value))} /></label>
+      </div><p>زمان بر اساس ساعت این دستگاه است. موارد ایجاد یا ویرایش‌شده پس از آن، تازه‌اند. همه تازه‌ها در هر بخش تکرار می‌شوند؛ داده‌های قبلی بین بخش‌ها تقسیم می‌شوند. فقط بخش اول تازه‌ها را با یکدیگر مقایسه می‌کند.</p><p>این تاریخ فرضِ بررسی قبلی شماست؛ خروجی گرفتن چیزی را بررسی‌شده علامت نمی‌زند. فقط پس از پایان همه بخش‌ها و رسیدگی به نتایج، تاریخ را جلو ببرید؛ بررسی یک شهر یا گروه به معنی بررسی کل پایگاه نیست.</p></div>}
     </section>
     <section className="duplicate-panel"><h2>۲. بررسی نتیجه هوش مصنوعی</h2>
-      <div className="duplicate-controls"><label>فایل نتیجه JSON<input type="file" accept=".json,application/json" disabled={busy} onChange={e => loadFile(e.target.files?.[0])} /></label>
+      <div className="duplicate-controls"><label>فایل‌های نتیجه JSON<input type="file" multiple accept=".json,application/json" disabled={busy} onChange={e => loadFiles(e.target.files)} /></label>
         <Button disabled={busy || !groups.length} onClick={preview}>پیش‌نمایش بدون تغییر</Button>
         <Button variant="outline" disabled={busy || !results.length} onClick={() => downloadDuplicateFile("business-duplicates-report.json", JSON.stringify({ schema_version: "1.0", results }, null, 2))}>دانلود گزارش کامل JSON</Button>
         <Button variant="outline" disabled={busy || !results.length} onClick={() => downloadDuplicateFile("business-duplicates-report.txt", readableDuplicateReport(results), "text/plain")}>دانلود گزارش متنی</Button>
       </div>
+      {coverage && <p role="status">{coverage.total === null ? `${coverage.received} فایل نتیجه خوانده شد.` : `${coverage.received} از ${coverage.total} بخش دریافت شد.`}{!coverage.complete && " ابتدا همه فایل‌های نتیجه این بسته را با هم انتخاب کنید؛ اعمال تغییرات تا آن زمان غیرفعال است."}</p>}
       {results.map(r => <article className="duplicate-group" key={r.keep_id}>
         <header><h3>نگه‌داری #{r.keep_id} · بایگانی {r.remove_ids.map(id => `#${id}`).join("، ")}</h3><span>{({ preview: "آماده بررسی", blocked: "مسدود", merged: "تکراری‌ها بایگانی شدند", already_applied: "قبلاً انجام شده", error: "خطا" } as Record<string, string>)[r.action] ?? r.action} · {r.confidence === "possible" ? "احتمالی" : "پیشنهاد قطعی"}</span></header>
         <p>{r.reason}</p>{r.message && <p role="alert">{r.message}</p>}
+        {r.proposals && <details><summary>پیشنهادهای اولیه بخش‌های مختلف؛ هم‌پوشانی به معنی تأیید یکسان بودن نیست</summary>{r.proposals.map((g, i) => <p key={i}>نگه‌داری #{g.keep_id} · بایگانی {g.remove_ids.join("، ")} · {g.reason}</p>)}</details>}
         {r.plan?.blocked.map(text => <p className="duplicate-error" key={text}>{text}</p>)}
         <div className="duplicate-records">{r.records?.map(record => <section key={record.service.id} className={record.service.id === r.keep_id ? "duplicate-keeper" : ""}>
           <h4>{record.service.id === r.keep_id ? "نگه‌داری" : "بایگانی"}: <Link to={`/services/${record.service.id}`} target="_blank">{record.service.name} · #{record.service.id}</Link></h4>
@@ -147,12 +197,13 @@ export default function BusinessDuplicates() {
           <details><summary>تمام جزئیات و متن منبع</summary><pre dir="ltr">{JSON.stringify(record, null, 2)}</pre></details>
         </section>)}</div>
         {r.plan && <p>رکورد #{r.keep_id} بدون تغییر باقی می‌ماند. نسخه کامل رکوردهای دیگر بایگانی و از فهرست فعال حذف می‌شود.</p>}
+        {r.action === "preview" && r.confidence === "possible" && <div className="duplicate-incremental"><p>فقط اگر پس از دیدن جزئیات، همه این موارد را یک کسب‌وکار می‌دانید، نسخه کامل‌تر را انتخاب کنید؛ در شرایط برابر، جدیدتر اولویت دارد.</p><div className="duplicate-controls"><label>نسخه قابل نگه‌داری<select disabled={busy} value={keeperChoices[duplicateGroupKey(r)] ?? r.keep_id} onChange={e => setKeeperChoices(old => ({ ...old, [duplicateGroupKey(r)]: Number(e.target.value) }))}>{r.records?.map(record => <option value={record.service.id} key={record.service.id}>#{record.service.id} · {record.service.name}</option>)}</select></label><Button variant="outline" disabled={busy} onClick={() => confirmPossible(r)}>تأیید یکسان بودن و انتخاب نسخه</Button></div></div>}
         {r.action === "preview" && r.confidence === "likely" && <label className="duplicate-check"><input type="checkbox" disabled={busy} checked={selected.has(r.keep_id)} onChange={e => { setConfirmed(false); setSelected(old => { const next = new Set(old); if (e.target.checked) next.add(r.keep_id); else next.delete(r.keep_id); return next; }); }} />نگه‌داری این نسخه و حذف تکراری‌های این گروه را تأیید می‌کنم</label>}
       </article>)}
     </section>
     <section className="duplicate-panel"><h2>۳. اعمال گروه‌های انتخاب‌شده</h2><p>اطلاعات، تماس‌ها و دسته‌های رکورد اصلی تغییر نمی‌کنند. نسخه‌های تکراری از فهرست فعال حذف و به‌طور کامل بایگانی می‌شوند. ذخیره‌های کاربران به رکورد باقی‌مانده هدایت می‌شوند.</p>
       <label className="duplicate-check"><input type="checkbox" disabled={busy || !selected.size} checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />انتقال رکوردهای انتخاب‌شده از فهرست فعال به بایگانی را تأیید می‌کنم.</label>
-      <Button disabled={busy || !selected.size || !confirmed} onClick={apply}>اعمال {selected.size} گروه انتخاب‌شده</Button>
+      <Button disabled={busy || !selected.size || !confirmed || coverage?.complete === false} onClick={apply}>اعمال {selected.size} گروه انتخاب‌شده</Button>
     </section>
     <section className="duplicate-panel"><h2>بایگانی خصوصی</h2><Button variant="outline" disabled={busy} onClick={() => loadArchives()}>دریافت بایگانی</Button>
       {archiveLoaded && !archives.records.length && <p>بایگانی خالی است.</p>}
