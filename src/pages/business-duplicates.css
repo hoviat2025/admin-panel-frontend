@@ -19,5 +19,8 @@
 .duplicate-incremental select { max-width: 100%; }
 .duplicate-loaded-files li { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
 .duplicate-loaded-files bdi { overflow-wrap: anywhere; min-width: 0; }
+.duplicate-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin-top: 1rem; }
+.duplicate-actions .duplicate-check { margin: 0; }
+.duplicate-bulk { border-color: #edbdba; }
 .duplicate-panel li { margin: .4rem 0; overflow-wrap: anywhere; }
 @media (max-width: 600px) { .duplicate-panel { padding: .8rem; } .duplicate-controls > button { width: 100%; } }
