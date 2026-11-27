@@ -15,6 +15,7 @@ import Statistics from "./pages/Statistics";
 import ServiceManagement from "./pages/ServiceManagement";
 import { lazy, Suspense } from "react";
 const BusinessImport = lazy(() => import("./pages/BusinessImport"));
+const BusinessDuplicates = lazy(() => import("./pages/BusinessDuplicates"));
 import ServiceEditor from "./pages/ServiceEditor";
 import CategoryManagement from "./pages/CategoryManagement";
 
@@ -76,6 +77,7 @@ const AppRoutes = () => {
         element={<ProtectedRoute><ServiceEditor /></ProtectedRoute>}
       />
       <Route path="/services/import" element={<ProtectedRoute><Suspense fallback={<p role="status">در حال بارگذاری…</p>}><BusinessImport /></Suspense></ProtectedRoute>} />
+      <Route path="/services/duplicates" element={<ProtectedRoute><Suspense fallback={<p role="status">در حال بارگذاری…</p>}><BusinessDuplicates /></Suspense></ProtectedRoute>} />
       <Route
         path="/services/:serviceId"
         element={<ProtectedRoute><ServiceEditor /></ProtectedRoute>}

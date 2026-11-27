@@ -29,6 +29,11 @@ import {
 
 const BASE = `${API_BASE_URL}/admin/service-management`;
 
+/** Reuses the existing admin session and error handling; no other API changes. */
+export async function directoryDuplicateRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  return (await request<T>(`/duplicates${path}`, init)).data;
+}
+
 export interface LocationCity { id: number; city: string; count: number }
 export interface LocationState { id: number; state: string; total: number; cities: LocationCity[] }
 export interface LocationCountry { country_code: string; total: number; states: LocationState[] }

@@ -1,0 +1,19 @@
+.duplicate-workspace { max-width: 1300px; }
+.duplicate-panel { margin: 1rem 0; padding: 1.25rem; border: 1px solid #fff; border-radius: 1.25rem; background: #ffffffd9; }
+.duplicate-panel h2 { font-weight: 700; font-size: 1.15rem; margin-bottom: .8rem; }
+.duplicate-panel p { margin: .6rem 0; line-height: 1.9; }
+.duplicate-controls { display: flex; flex-wrap: wrap; gap: .75rem; align-items: end; }
+.duplicate-controls label { display: grid; gap: .4rem; flex: 1 1 180px; min-width: 0; }
+.duplicate-controls input, .duplicate-controls select { border: 1px solid #b8d5e5; border-radius: .5rem; padding: .65rem; min-width: 0; width: 100%; background: white; }
+.duplicate-group { border-top: 2px solid #cce0ee; padding: 1.2rem 0; margin-top: 1rem; }
+.duplicate-group h3, .duplicate-group h4 { font-weight: 700; overflow-wrap: anywhere; }
+.duplicate-records { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); gap: .7rem; margin: 1rem 0; }
+.duplicate-records > section { min-width: 0; padding: .9rem; border: 1px solid #d6e1ec; border-radius: .8rem; background: #f8fafc; }
+.duplicate-records > .duplicate-keeper { border-color: #429a88; background: #effcf7; }
+.duplicate-workspace pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-height: 420px; overflow: auto; background: #f1f5f9; padding: .6rem; }
+.duplicate-workspace summary { cursor: pointer; padding: .5rem 0; }
+.duplicate-check { display: flex; align-items: start; gap: .6rem; margin: 1rem 0; }
+.duplicate-check input { margin-top: .3rem; }
+.duplicate-error { color: #a12222; background: #fff1f1; padding: .6rem; border-radius: .5rem; }
+.duplicate-panel li { margin: .4rem 0; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .duplicate-panel { padding: .8rem; } .duplicate-controls > button { width: 100%; } }
