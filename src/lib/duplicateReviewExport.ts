@@ -46,7 +46,7 @@ export function buildReviewFiles(records: CompactRecord[], options: ReviewOption
     checked_through: options.checkedThrough, filters: options.filters,
     new_count: fresh.length, old_count: old.length, total_parts: total,
     parts: files.map(f => f.name),
-    instructions: "Use one part plus the prompt in each AI session. Collect ALL result files, then upload them together before applying anything. All new records repeat in every part; old records occur once. Only part 1 checks new vs new. Exporting does not mark records checked. Advance the cutoff only after all parts and findings are handled, and only for the reviewed filter scope. This is a paged read, not a frozen database snapshot; edits/new arrivals during export need a later review.",
+    instructions: "Use one part plus the prompt in each AI session. Result files can be uploaded and applied one part at a time, or together. Adding a file retains earlier files on the page. Already-applied records are recognized; changed survivors need a new preview and explicit keeper confirmation. All new records repeat in every part; old records occur once. Only part 1 checks new vs new. Exporting does not mark records checked. Advance the cutoff only after all parts and findings are handled, and only for the reviewed filter scope. This is a paged read, not a frozen database snapshot; edits/new arrivals during export need a later review.",
   };
   return [{ name: "manifest.json", content: JSON.stringify(manifest, null, 2) }, ...files];
 }

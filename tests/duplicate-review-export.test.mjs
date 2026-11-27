@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildReviewFiles, reviewZip } from "../src/lib/duplicateReviewExport.ts";
-import { combineDuplicateFiles } from "../src/lib/businessDuplicates.ts";
+import { addDuplicateFiles, combineDuplicateFiles } from "../src/lib/businessDuplicates.ts";
 
 const rec = (id, fresh) => ({ id, title: `Business ${id}`, city: "Berlin", address: null, phones: [],
   created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z", description_excerpt: null,
@@ -80,4 +80,18 @@ test("mixed exports, repeated part numbers, malformed metadata and overlapping I
   assert.throws(() => combineDuplicateFiles([JSON.stringify({ schema_version: "1.0", export_id: "x", groups: [] })]));
   assert.throws(() => combineDuplicateFiles([result(1, [group(1, [10]), group(2, [10])])]));
   assert.equal(combineDuplicateFiles([JSON.stringify({ schema_version: "1.0", groups: [group(1, [2])] })]).groups.length, 1);
+});
+
+test("parts accumulate across selections; selecting a revised part replaces it without losing other parts", () => {
+  const first = { name: "part-1.json", text: result(1, [group(1, [10])]) };
+  const second = { name: "part-2.json", text: result(2, []) };
+  const files = addDuplicateFiles([first], [second]);
+  assert.equal(files.length, 2);
+  assert.equal(combineDuplicateFiles(files.map(f => f.text)).coverage.complete, true);
+  const revised = { name: "revised-1.json", text: result(1, [group(10, [1])]) };
+  const replaced = addDuplicateFiles(files, [revised]);
+  assert.equal(replaced.length, 2);
+  assert.equal(JSON.parse(replaced[0].text).groups[0].keep_id, 10);
+  assert.throws(() => addDuplicateFiles(files, [{ name: "different.json", text: result(1, [], 2, "different-run") }]));
+  assert.equal(files[0].text, first.text, "Invalid additions must not mutate the previous selection");
 });

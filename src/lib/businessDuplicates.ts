@@ -10,6 +10,8 @@ export interface Snapshot {
 export interface MergeResult extends DuplicateGroup {
   action: string; message?: string; records?: Snapshot[];
   proposals?: DuplicateGroup[];
+  requested_group?: DuplicateGroup;
+  resolved_ids?: Record<string, number>;
   plan?: { blocked: string[]; operation: "keep_unchanged_archive_others"; keep_id: number; archive_ids: number[]; bookmarks?: string; sources?: string };
 }
 export interface CompactPage { records: import("./duplicateReviewExport").CompactRecord[]; ceiling: number; next_after: number | null }
@@ -33,6 +35,26 @@ export function parseDuplicateFile(text: string): DuplicateGroup[] {
 
 export const duplicateGroupKey = (g: DuplicateGroup) => [g.keep_id, ...g.remove_ids].sort((a, b) => a - b).join(":");
 
+export interface LoadedDuplicateFile { name: string; text: string }
+
+/** Selecting files adds/replaces parts; it does not discard the earlier work. */
+export function addDuplicateFiles(previous: LoadedDuplicateFile[], incoming: LoadedDuplicateFile[]): LoadedDuplicateFile[] {
+  const key = (file: LoadedDuplicateFile) => {
+    parseDuplicateFile(file.text);
+    const data = JSON.parse(file.text.replace(/^\uFEFF/, ""));
+    return data.export_id !== undefined && data.part_number !== undefined
+      ? `part:${data.export_id}:${data.part_number}` : `file:${file.name}`;
+  };
+  const combined = new Map(previous.map(f => [key(f), f]));
+  for (const file of incoming) combined.set(key(file), file);
+  const files = [...combined.values()];
+  if (files.length > 5000) throw new Error("حداکثر ۵۰۰۰ فایل در هر بررسی وارد کنید.");
+  if (files.some(f => new TextEncoder().encode(f.text).length > 2 * 1024 * 1024) ||
+      files.reduce((n, f) => n + new TextEncoder().encode(f.text).length, 0) > 25 * 1024 * 1024) throw new Error("حداکثر هر فایل ۲ مگابایت و مجموع فایل‌ها ۲۵ مگابایت است.");
+  combineDuplicateFiles(files.map(f => f.text));
+  return files;
+}
+
 /** Cross-session overlaps are review-only, never an automatic transitive merge. */
 export function combineDuplicateFiles(texts: string[]): { groups: DuplicateGroup[]; reviews: Record<string, DuplicateGroup[]>; coverage: { received: number; total: number | null; complete: boolean } } {
   const proposals: DuplicateGroup[] = [];
@@ -40,6 +62,7 @@ export function combineDuplicateFiles(texts: string[]): { groups: DuplicateGroup
   const totals = new Set<number>();
   let metadataFiles = 0;
   for (const text of texts) {
+    const parsedGroups = parseDuplicateFile(text);
     const parsed = JSON.parse(text.replace(/^\uFEFF/, ""));
     if (parsed.export_id !== undefined || parsed.part_number !== undefined || parsed.total_parts !== undefined) {
       metadataFiles++;
@@ -56,7 +79,7 @@ export function combineDuplicateFiles(texts: string[]): { groups: DuplicateGroup
       if (!Number.isSafeInteger(parsed.part_number) || parsed.part_number < 1 || partNumbers.has(parsed.part_number)) throw new Error("شماره بخش نامعتبر یا تکراری است؛ فقط یک نتیجه برای هر بخش وارد کنید.");
       partNumbers.add(parsed.part_number);
     }
-    for (const g of parseDuplicateFile(text)) {
+    for (const g of parsedGroups) {
       const key = `${g.keep_id}|${[...g.remove_ids].sort((a, b) => a - b)}|${g.confidence}`;
       if (!seen.has(key)) { seen.add(key); proposals.push(g); }
     }
@@ -107,6 +130,7 @@ export function readableDuplicateReport(results: MergeResult[]): string {
   return results.map(r => [
     `نگه‌داری: ${r.keep_id} | انتقال به بایگانی: ${r.remove_ids.join(", ")} | ${r.action}`,
     r.reason, r.message ?? "",
+    ...(r.resolved_ids ? [`شناسه‌های قبلاً بایگانی‌شده و رکورد فعلی:\n${JSON.stringify(r.resolved_ids, null, 2)}`] : []),
     ...(r.proposals?.length ? [`پیشنهادهای اولیه بخش‌ها:\n${JSON.stringify(r.proposals, null, 2)}`] : []),
     ...(r.records ?? []).map(record => `${record.service.id === r.keep_id ? "نگه‌داری" : "بایگانی"} #${record.service.id}\n${JSON.stringify(record, null, 2)}`),
     `تغییرات پیشنهادی:\n${JSON.stringify(r.plan ?? {}, null, 2)}`,
